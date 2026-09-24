@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Midair.io - 深夜ラジオのアジト。周波数を合わせて24時間リアルタイム匿名BBSへ。" />
+    <title>Midair.io - 深夜ラジオのアジト</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+      /*
+       * このファイルは Vite（npm run dev）用のエントリです。
+       * VS Code Live Server 等の素の静的サーバーで直接開かれた場合は、
+       * 生成済みのスタンドアロン版（リポジトリ直下の index.html）へ案内する。
+       * 本番ビルド（dist）ではエントリが差し替わり /src/main.js が無いため何もしない。
+       */
+      (function () {
+        var entry = null;
+        var scripts = document.getElementsByTagName('script');
+        for (var i = 0; i < scripts.length; i++) {
+          if (scripts[i].type === 'module' && /\/src\/main\.js(\?|$)/.test(scripts[i].getAttribute('src') || '')) {
+            entry = scripts[i];
+            break;
+          }
+        }
+        if (!entry) return; // 本番ビルドでは何もしない
+        var done = false;
+        var go = function () {
+          if (done) return;
+          done = true;
+          window.location.replace('../index.html');
+        };
+        var timer = setTimeout(go, 1500);
+        fetch('/@vite/client').then(
+          function (r) {
+            if (r.ok) clearTimeout(timer);
+            else go();
+          },
+          function () {
+            go();
+          }
+        );
+      })();
+    </script>
+  </body>
+</html>
