@@ -6,9 +6,57 @@
     <meta name="description" content="Midair.io - 深夜ラジオのアジト。周波数を合わせて24時間リアルタイム匿名BBSへ。" />
     <title>Midair.io - 深夜ラジオのアジト</title>
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+
+    <!-- 共有 / AIエージェント向けメタ情報 -->
+    <meta name="robots" content="index, follow" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Midair.io" />
+    <meta property="og:title" content="Midair.io - 深夜ラジオのアジト" />
+    <meta property="og:description" content="周波数を合わせて各チャンネルに入る、24時間リアルタイム匿名ラジオBBS。" />
+    <meta property="og:url" content="https://music.wawa-app.me/Midair.io/" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Midair.io - 深夜ラジオのアジト" />
+    <meta name="twitter:description" content="周波数を合わせて各チャンネルに入る、24時間リアルタイム匿名ラジオBBS。" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Midair.io",
+        "alternateName": "ミッドエア",
+        "url": "https://music.wawa-app.me/Midair.io/",
+        "description": "周波数をダイヤルで合わせて各チャンネル（番組）に入る、24時間リアルタイム匿名ラジオBBS。",
+        "inLanguage": "ja"
+      }
+    </script>
   </head>
   <body>
-    <div id="app"></div>
+    <!-- JS 読み込み前 / 非JSクローラー向けの静的コンテンツ（Vue がマウントすると置き換わります） -->
+    <div id="app">
+      <main class="boot">
+        <h1>Midair.io（ミッドエア）</h1>
+        <p>周波数をダイヤルで合わせて各チャンネル（番組）に入る、24時間リアルタイム匿名ラジオBBS。</p>
+        <p>
+          公開URL:
+          <a href="https://music.wawa-app.me/Midair.io/">https://music.wawa-app.me/Midair.io/</a>
+        </p>
+        <p>読み込み中…</p>
+      </main>
+      <noscript>
+        <p>このサイトのご利用には JavaScript が必要です。</p>
+      </noscript>
+    </div>
+    <style>
+      .boot {
+        max-width: 640px;
+        margin: 12vh auto;
+        padding: 0 20px;
+        color: #d8d8d8;
+        font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", Menlo, Consolas, monospace;
+        line-height: 1.8;
+      }
+      .boot h1 { font-size: 22px; letter-spacing: 2px; }
+      .boot a { color: #4fd08a; }
+    </style>
     <script type="module" src="/src/main.js"></script>
     <script>
       /*
