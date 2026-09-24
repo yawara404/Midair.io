@@ -210,13 +210,13 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
                         )
                         if reply:
                             bot_payload = await _persist_message(
-                                station_id, "AI", reply, is_dj=True
+                                station_id, "DJ", reply, is_dj=True
                             )
                             await manager.broadcast(
                                 station_id, {"type": "message", **bot_payload}
                             )
                             await send_to_discord(
-                                settings.discord_webhook_url, reply, f"[{station_name}] AI"
+                                settings.discord_webhook_url, reply, f"[{station_name}] DJ"
                             )
                     except Exception:
                         pass

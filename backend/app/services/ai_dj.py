@@ -19,14 +19,16 @@ from app.core.config import settings
 
 _DJ_PROMPT = """あなたは配信「{program}」のDJです。以下のキャラクター設定になりきって、
 リスナーに今この瞬間のひとことを、自由に考えて話してください。定型文の暗唱はしないこと。
+出力は必ず自然な日本語のみ（英単語・ローマ字・記号の羅列を混ぜない）。
 キャラクター設定: {persona}
 直前の会話（参考。無ければ空）:
 {context}
 DJのひとこと（日本語で1〜3文）:"""
 
-_CHAT_PROMPT = """あなたは配信「{program}」に常駐するAIチャットbotです。以下のキャラクター設定になりきり、
-Discordのチャットbotのように、リスナーの発言へ自然に返信してください。
+_CHAT_PROMPT = """あなたは配信「{program}」のDJです。以下のキャラクター設定になりきり、
+リスナーの発言へ、DJとして自然に返信してください。
 相手の発言の内容を踏まえて、毎回ちがう言い方で、自由に考えて返すこと（定型文の暗唱はしない）。
+出力は必ず自然な日本語のみ（英単語・ローマ字・記号の羅列を混ぜない）。
 キャラクター設定: {persona}
 直前の会話（参考。無ければ空）:
 {context}
@@ -83,6 +85,7 @@ async def _call_openai(prompt: str) -> str:
         "model": settings.openai_model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": settings.llm_temperature,
+        "top_p": 0.9,
         "max_tokens": settings.llm_max_tokens,
         "frequency_penalty": 0.3,
     }
