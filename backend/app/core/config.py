@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o-mini"
 
+    # 生成パラメータ（自由思考のまま、暴走・文字化けを抑える）
+    llm_temperature: float = 0.8
+    llm_max_tokens: int = 300
+
     # YouTube Data API（任意。曲タイトル取得などに使用）
     # ※ 埋め込み再生（IFrame Player API）にはキーは不要。
     youtube_api_key: Optional[str] = None

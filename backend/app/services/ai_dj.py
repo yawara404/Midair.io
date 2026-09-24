@@ -59,7 +59,13 @@ async def _call_gemini(prompt: str) -> str:
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"{settings.gemini_model}:generateContent?key={settings.gemini_api_key}"
     )
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": settings.llm_temperature,
+            "maxOutputTokens": settings.llm_max_tokens,
+        },
+    }
     async with httpx.AsyncClient() as client:
         resp = await client.post(url, json=payload, timeout=25)
         resp.raise_for_status()
@@ -76,7 +82,9 @@ async def _call_openai(prompt: str) -> str:
     payload = {
         "model": settings.openai_model,
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 1.0,
+        "temperature": settings.llm_temperature,
+        "max_tokens": settings.llm_max_tokens,
+        "frequency_penalty": 0.3,
     }
     async with httpx.AsyncClient() as client:
         resp = await client.post(
