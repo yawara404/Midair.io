@@ -14,7 +14,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { apiBase } from '../api'
+import { apiRoot } from '../api'
 
 // エコシステム用の埋め込みプレビューカード。
 // 他サービス（TuneDrop / vocaloid.hz など）にURLを貼る際の表示イメージ。
@@ -55,7 +55,7 @@ onMounted(async () => {
         : null
   if (freq == null) return
   try {
-    const res = await fetch(`${apiBase()}/api/preview?frequency=${freq}`)
+    const res = await fetch(`${apiRoot()}/preview?frequency=${freq}`)
     const json = await res.json()
     if (json.success) data.value = json
   } catch (e) {

@@ -1,5 +1,6 @@
+// 軽量なAPIクライアント（JWTを自動付与）
 import { defineStore } from 'pinia'
-import { apiBase } from '../api'
+import { apiRoot } from '../api'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -38,7 +39,7 @@ export const useAuthStore = defineStore('auth', {
       }
       if (this.user) return
       try {
-        const res = await fetch(`${apiBase()}/api/auth/me`, {
+        const res = await fetch(`${apiRoot()}/auth/me`, {
           headers: { Authorization: `Bearer ${this.token}` },
         })
         const body = await res.json().catch(() => ({}))
@@ -62,7 +63,7 @@ export const useAuthStore = defineStore('auth', {
       this.token = token
       history.replaceState({}, '', window.location.pathname + window.location.hash)
       try {
-        const res = await fetch(`${apiBase()}/api/auth/me`, {
+        const res = await fetch(`${apiRoot()}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         const body = await res.json()

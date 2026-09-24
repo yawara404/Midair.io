@@ -76,7 +76,7 @@ import ChatStream from '../components/ChatStream.vue'
 import MessageInput from '../components/MessageInput.vue'
 import RadioPlayer from '../components/RadioPlayer.vue'
 import MarqueeText from '../components/MarqueeText.vue'
-import { api, getToken, wsHost } from '../api'
+import { api, getToken, wsHost, wsPath } from '../api'
 import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()

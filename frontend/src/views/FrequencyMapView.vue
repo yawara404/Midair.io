@@ -129,7 +129,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api, getToken, wsHost } from '../api'
+import { api, getToken, wsHost, wsPath } from '../api'
 import { useAuthStore } from '../stores/auth'
 import DedicatedApplyForm from '../components/DedicatedApplyForm.vue'
 
@@ -276,7 +276,7 @@ function connectSocket() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'
   const token = getToken()
   const qs = token ? `?token=${encodeURIComponent(token)}` : ''
-  socket = new WebSocket(`${proto}://${wsHost()}/ws${qs}`)
+  socket = new WebSocket(`${proto}://${wsHost()}${wsPath()}${qs}`)
   socket.onmessage = (event) => {
     let d
     try {
