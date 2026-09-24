@@ -103,6 +103,8 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .chat__empty {
@@ -189,5 +191,24 @@ onMounted(async () => {
 
 .msg--youtube {
   border-left-color: var(--green);
+}
+
+/* ===== モバイル最適化 ===== */
+@media (max-width: 560px) {
+  .chat__log {
+    padding: 10px;
+    gap: 8px;
+  }
+  .msg__content {
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  .msg--dj {
+    padding: 7px 9px;
+  }
+  .chat__jump {
+    right: 10px;
+    bottom: 10px;
+  }
 }
 </style>

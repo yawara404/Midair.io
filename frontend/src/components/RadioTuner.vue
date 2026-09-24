@@ -408,8 +408,8 @@ function stopDrag() {
       'map map'
       'presets presets';
     align-items: center;
-    gap: 10px 12px;
-    padding: 12px;
+    gap: 8px 10px;
+    padding: 10px;
   }
   .tuner__meter {
     grid-area: meter;
@@ -452,7 +452,15 @@ function stopDrag() {
   }
   .tuner__program {
     grid-area: program;
-    padding-top: 10px;
+    padding-top: 8px;
+  }
+  .tuner__program-name {
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+  .tuner__program-desc {
+    font-size: 11px;
+    line-height: 1.5;
   }
   .tuner__map {
     grid-area: map;
@@ -460,12 +468,12 @@ function stopDrag() {
   .tuner__presets {
     grid-area: presets;
     grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
+    gap: 6px;
   }
   .preset {
     font-size: 12px;
-    min-height: 40px;
-    padding: 8px 2px;
+    min-height: 36px;
+    padding: 6px 2px;
   }
 }
 </style>

@@ -528,7 +528,7 @@ body {
   }
 
   .app-main {
-    padding: 14px;
+    padding: 10px 12px;
   }
 }
 @media (max-width: 520px) {
@@ -546,7 +546,7 @@ body {
     padding: 11px 16px;
   }
   .app-main {
-    padding: 10px;
+    padding: 8px;
   }
   .btn {
     font-size: 12px;

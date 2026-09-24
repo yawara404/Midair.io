@@ -112,14 +112,28 @@ function callDj() {
 }
 
 @media (max-width: 640px) {
-  /* チャット入力は全幅、ボタンは等幅で折り返し */
-  .input__chat .input__field,
+  .input {
+    gap: 6px;
+    margin-top: 8px;
+  }
+  /* チャットは「入力欄＋送信」を1行に収めて縦を節約 */
+  .input__chat .input__field {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .input__chat .btn {
+    flex: 0 0 auto;
+    padding: 9px 14px;
+  }
+  /* リクエスト行は折り返し（URL欄は全幅、ボタンは等幅） */
   .input__row .input__field {
     flex-basis: 100%;
   }
-  .input__chat .btn,
   .input__row .btn {
     flex: 1;
+  }
+  .input__field {
+    padding: 9px 10px;
   }
 }
 </style>

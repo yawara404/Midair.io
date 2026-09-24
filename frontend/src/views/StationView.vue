@@ -1,12 +1,22 @@
 <template>
   <div class="station-view">
     <div class="station-view__grid">
-      <RadioTuner
-        :channels="stations"
-        :current-frequency="frequency"
-        :listener-count="listenerCount"
-        @change-frequency="changeFrequency"
-      />
+      <div class="station-view__tuner" :class="{ 'is-collapsed': !tunerOpen }">
+        <button
+          class="station-view__tuner-toggle"
+          type="button"
+          @click="tunerOpen = !tunerOpen"
+        >
+          <span>{{ tunerOpen ? '▲ チューナーを閉じる' : '▼ チューナーを開く' }}</span>
+          <span class="station-view__tuner-freq">{{ frequency.toFixed(1) }} MHz</span>
+        </button>
+        <RadioTuner
+          :channels="stations"
+          :current-frequency="frequency"
+          :listener-count="listenerCount"
+          @change-frequency="changeFrequency"
+        />
+      </div>
 
       <section class="station-view__stream">
         <div class="now">
@@ -83,6 +93,8 @@ const connected = ref(false)
 const listenerCount = ref(0)
 const track = ref({ videoId: null, startedAt: null })
 const favorited = ref(false)
+// モバイルではチューナーを折りたたんでチャットを最大化する
+const tunerOpen = ref(false)
 
 let socket = null
 
@@ -328,6 +340,17 @@ onBeforeUnmount(() => {
 .station-view__grid > * {
   min-width: 0;
 }
+/* チューナー列（ラッパー）。PC では中身を縦いっぱいに伸ばす */
+.station-view__tuner {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.station-view__tuner :deep(.tuner) {
+  flex: 1;
+  min-height: 0;
+}
 .station-view__stream {
   display: flex;
   flex-direction: column;
@@ -344,6 +367,10 @@ onBeforeUnmount(() => {
 .station-view :deep(.tuner) {
   min-height: 0;
   overflow-y: auto;
+}
+/* モバイル用チューナー折りたたみトグル（PCでは非表示） */
+.station-view__tuner-toggle {
+  display: none;
 }
 
 .now {
@@ -434,16 +461,19 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1080px) {
-  /* モバイルはページ全体をスクロールさせ、チャットだけ高さを固定 */
+  /* モバイルは縦積み。チャットを画面いっぱいに近づける */
   .station-view {
     height: auto;
   }
   .station-view__grid {
     grid-template-columns: 1fr;
+    gap: 10px;
   }
   .station-view__stream {
-    height: 78vh;
-    min-height: 480px;
+    /* ビューポート高さいっぱいのチャット（ヘッダー・トグル等を差し引く） */
+    height: calc(100dvh - 170px);
+    min-height: 460px;
+    max-height: 1000px;
   }
   .station-view__side {
     overflow: visible;
@@ -451,25 +481,57 @@ onBeforeUnmount(() => {
   .station-view :deep(.tuner) {
     overflow: visible;
   }
+
+  /* チューナー折りたたみトグル（モバイルのみ） */
+  .station-view__tuner-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    color: var(--green);
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+  }
+  .station-view__tuner-freq {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .station-view__tuner.is-collapsed :deep(.tuner) {
+    display: none;
+  }
 }
 
 @media (max-width: 560px) {
   .station-view__grid {
-    gap: 10px;
+    gap: 8px;
+  }
+  .station-view__stream {
+    height: calc(100dvh - 156px);
+    min-height: 420px;
   }
   .now {
     flex-wrap: wrap;
-    font-size: 13px;
-    gap: 8px;
-    padding: 8px 12px;
-    margin-bottom: 8px;
+    font-size: 12px;
+    gap: 6px;
+    padding: 7px 10px;
+    margin-bottom: 6px;
   }
   .now__freq {
     margin-left: auto;
   }
-  .station-view__stream {
-    height: 80vh;
-    min-height: 520px;
+  .thread-bar {
+    padding: 6px 10px;
+    margin: 6px 0 8px;
+    font-size: 11px;
+    gap: 6px;
+  }
+  .thread-bar__archive {
+    padding: 2px 6px;
   }
 }
 </style>
