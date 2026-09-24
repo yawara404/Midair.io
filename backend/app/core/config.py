@@ -52,6 +52,19 @@ class Settings(BaseSettings):
     # AIチャットbot（リスナーの発言に返信）のクールダウン秒数
     bot_reply_cooldown_seconds: int = 12
 
+    # --- LINE WORKS 連携（Miaちゃんのチャットbot） ---
+    # 双方向: Midair → LINE WORKS チャンネルへ転送 / LINE WORKS → Midair に投稿
+    lineworks_enabled: bool = False
+    lineworks_client_id: Optional[str] = None
+    lineworks_client_secret: Optional[str] = None
+    lineworks_service_account: Optional[str] = None
+    # PEM秘密鍵（改行はそのまま、または \n エスケープ可）
+    lineworks_private_key: Optional[str] = None
+    lineworks_bot_id: Optional[str] = None
+    lineworks_channel_id: Optional[str] = None
+    # 連携する Midair の局（コールサイン）
+    lineworks_station_callsign: str = "Miaちゃん"
+
     # 自動DJ局（DJ BOT）— 流行りの曲からランダムに流し続ける常時オンエア局
     dj_bot_enabled: bool = True
     dj_bot_frequency: float = 84.0

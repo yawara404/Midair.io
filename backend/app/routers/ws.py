@@ -173,44 +173,53 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
                 await send_to_discord(
                     settings.discord_webhook_url, content, f"[{station_name}] {handle}"
                 )
-                # AIチャットbot（例: Miaちゃん）の返信（自由思考・文脈つき）
-                try:
-                    from app.services.ai_dj import maybe_chat_reply
+                # Miaちゃん局は LINE WORKS へ転送（双方向連携）
+                if station_name == settings.lineworks_station_callsign:
+                    try:
+                        from app.services import lineworks
 
-                    context = ""
-                    async with async_session_factory() as cs:
-                        rows = (
-                            await cs.execute(
-                                select(Message)
-                                .where(Message.station_id == station_id)
-                                .order_by(Message.id.desc())
-                                .limit(6)
+                        if lineworks.is_configured():
+                            await lineworks.send_message(f"{handle}: {content}")
+                    except Exception:
+                        pass
+                else:
+                    # それ以外のAI局は Gemini で自由思考の返信（文脈つき）
+                    try:
+                        from app.services.ai_dj import maybe_chat_reply
+
+                        context = ""
+                        async with async_session_factory() as cs:
+                            rows = (
+                                await cs.execute(
+                                    select(Message)
+                                    .where(Message.station_id == station_id)
+                                    .order_by(Message.id.desc())
+                                    .limit(6)
+                                )
+                            ).scalars().all()
+                            context = "\n".join(
+                                f"{m.sender_name}: {m.content}" for m in reversed(rows)
                             )
-                        ).scalars().all()
-                        context = "\n".join(
-                            f"{m.sender_name}: {m.content}" for m in reversed(rows)
+                        reply = await maybe_chat_reply(
+                            station_id,
+                            station_name,
+                            ai_dj_prompt,
+                            ai_dj_enabled,
+                            content,
+                            context=context,
                         )
-                    reply = await maybe_chat_reply(
-                        station_id,
-                        station_name,
-                        ai_dj_prompt,
-                        ai_dj_enabled,
-                        content,
-                        context=context,
-                    )
-                    if reply:
-                        bot_payload = await _persist_message(
-                            station_id, "AI", reply, is_dj=True
-                        )
-                        await manager.broadcast(
-                            station_id, {"type": "message", **bot_payload}
-                        )
-                        # Discord 連携時は bot 返信も送る（Discordのチャットbot的に）
-                        await send_to_discord(
-                            settings.discord_webhook_url, reply, f"[{station_name}] Mia"
-                        )
-                except Exception:
-                    pass
+                        if reply:
+                            bot_payload = await _persist_message(
+                                station_id, "AI", reply, is_dj=True
+                            )
+                            await manager.broadcast(
+                                station_id, {"type": "message", **bot_payload}
+                            )
+                            await send_to_discord(
+                                settings.discord_webhook_url, reply, f"[{station_name}] AI"
+                            )
+                    except Exception:
+                        pass
 
             elif msg_type == "youtube_request":
                 raw = data.get("url") or data.get("video_id") or ""

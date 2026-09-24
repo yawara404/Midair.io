@@ -24,6 +24,7 @@ from app.routers import (
     bot,
     dedicated,
     frequencies,
+    lineworks,
     me,
     programs,
     stations,
@@ -272,6 +273,10 @@ async def _dj_loop() -> None:
                 if station is None or not station.ai_dj_enabled:
                     manager.touch(station_id)
                     continue
+                # LINE WORKS 連携局（Miaちゃん）は idle DJ を行わない
+                if station.callsign == settings.lineworks_station_callsign:
+                    manager.touch(station_id)
+                    continue
                 program = station.callsign
                 persona = station.ai_dj_prompt
             line = await generate_dj_line(program, persona=persona)
@@ -492,6 +497,7 @@ app.include_router(me.router)
 app.include_router(bot.router)
 app.include_router(dedicated.router)
 app.include_router(threads.router)
+app.include_router(lineworks.router)
 app.include_router(ws.router)
 
 
