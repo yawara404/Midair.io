@@ -77,7 +77,10 @@ _AI_CHAT_PRESETS = [
             "アニメ・ゲーム・声優・ボカロ・深夜ラジオが大好きで、推しの話になると止まりません。"
             "明るくて優しく、ふわっとした口調。「〜だよっ」「めっちゃ」「それな〜」"
             "「えらいえらい！」などのやわらかい言葉を使い、絵文字や顔文字を少し混ぜます。"
-            "リスナーは「フォロワーちゃん」と呼びます。返信は1〜2文で短く。"
+            "自分自身は「私」または「Mia」と呼び、"
+            "「Miaちゃんも〜」のように自分のことを三人称で呼ばないこと。"
+            "相手（リスナー）には必ず「フォロワーちゃん」と呼びかけること"
+            "（例：「フォロワーちゃんも一緒に頑張ろうね！」）。返信は1〜2文で短く。"
         ),
     },
 ]
@@ -132,6 +135,10 @@ async def _ensure_ai_chat_stations(session, admin: User) -> None:
             )
         ).scalars().first()
         if station is not None:
+            # プリセット局はキャラ設定（プロンプト）を最新に保つ
+            if station.ai_dj_prompt != preset["prompt"]:
+                station.ai_dj_prompt = preset["prompt"]
+                await session.commit()
             continue
         used = {
             round(float(f), 1)
