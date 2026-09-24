@@ -7,6 +7,7 @@ import LoginView from '../views/LoginView.vue'
 import StudioView from '../views/StudioView.vue'
 import TimetableView from '../views/TimetableView.vue'
 import ArchiveView from '../views/ArchiveView.vue'
+import ThreadView from '../views/ThreadView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import DedicatedView from '../views/DedicatedView.vue'
 import AdminView from '../views/AdminView.vue'
@@ -30,6 +31,7 @@ const router = createRouter({
     { path: '/studio', component: StudioView },
     { path: '/timetable', component: TimetableView },
     { path: '/archive', component: ArchiveView },
+    { path: '/thread/:id', component: ThreadView },
     { path: '/profile', component: ProfileView },
     { path: '/dedicated', component: DedicatedView },
     { path: '/admin', component: AdminView },
