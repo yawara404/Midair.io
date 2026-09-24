@@ -32,6 +32,7 @@ from app.routers import (
     ws,
 )
 from app.routers.frequencies import broadcast_frequency_status
+from app.services import discord_bot
 from app.services.ai_dj import generate_dj_line
 from app.services.bot_dj import play_limit_seconds, play_next
 from app.services.sessions import close_session, open_session
@@ -273,8 +274,11 @@ async def _dj_loop() -> None:
                 if station is None or not station.ai_dj_enabled:
                     manager.touch(station_id)
                     continue
-                # LINE WORKS 連携局（Miaちゃん）は idle DJ を行わない
-                if station.callsign == settings.lineworks_station_callsign:
+                # 外部連携局（Miaちゃん）は idle DJ を行わない
+                if station.callsign in (
+                    settings.discord_station_callsign,
+                    settings.lineworks_station_callsign,
+                ):
                     manager.touch(station_id)
                     continue
                 program = station.callsign
@@ -423,6 +427,8 @@ async def lifespan(app: FastAPI):
     dj_task = asyncio.create_task(_dj_loop())
     life_task = asyncio.create_task(_lifecycle_loop())
     bot_task = asyncio.create_task(_dj_bot_loop())
+    # Discord 双方向連携（Miaちゃん / 設定時のみ）
+    await discord_bot.start()
     # 専用局の自律運行（APScheduler: 10秒間隔）
     scheduler = _start_dedicated_scheduler()
     yield
@@ -431,6 +437,7 @@ async def lifespan(app: FastAPI):
             scheduler.shutdown(wait=False)
         except Exception:
             pass
+    await discord_bot.stop()
     for task in (dj_task, life_task, bot_task):
         task.cancel()
         try:

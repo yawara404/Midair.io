@@ -67,6 +67,15 @@ class Settings(BaseSettings):
     # 連携する Midair の局（コールサイン）
     lineworks_station_callsign: str = "Miaちゃん"
 
+    # --- Discord 連携（Miaちゃんのチャットbot・双方向 / discord.py Gateway） ---
+    # Midair → Discord チャンネルへ転送 / Discord チャンネル → Midair に投稿
+    discord_bot_enabled: bool = False
+    discord_bot_token: Optional[str] = None
+    # 連携する Discord のチャンネルID（テキストチャンネル）
+    discord_channel_id: Optional[str] = None
+    # 連携する Midair の局（コールサイン）
+    discord_station_callsign: str = "Miaちゃん"
+
     # 自動DJ局（DJ BOT）— 流行りの曲からランダムに流し続ける常時オンエア局
     dj_bot_enabled: bool = True
     dj_bot_frequency: float = 84.0
