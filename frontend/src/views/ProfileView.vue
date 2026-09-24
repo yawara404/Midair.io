@@ -23,7 +23,6 @@
       <div class="stats">
         <div class="stat"><span class="stat__num">{{ stats.stations }}</span><span class="stat__label">保有局</span></div>
         <div class="stat"><span class="stat__num">{{ stats.sessions }}</span><span class="stat__label">放送セッション</span></div>
-        <div class="stat"><span class="stat__num">{{ stats.tracks }}</span><span class="stat__label">曲ログ</span></div>
         <div class="stat"><span class="stat__num">{{ stats.messages }}</span><span class="stat__label">メッセージ</span></div>
         <div class="stat"><span class="stat__num">{{ stats.favorites }}</span><span class="stat__label">お気に入り</span></div>
       </div>
@@ -54,40 +53,13 @@
         </div>
       </section>
 
-      <!-- 過去の曲ログ -->
+      <!-- 過去スレッド（アーカイブ） -->
       <section class="block">
         <div class="block__head">
-          <h3>自分の過去の曲ログ</h3>
-          <button class="btn btn--ghost" @click="loadTracks">↻ 更新</button>
+          <h3>過去スレッド（アーカイブ）</h3>
+          <router-link class="btn btn--ghost" to="/archive">アーカイブを開く</router-link>
         </div>
-        <p v-if="!tracks.length" class="block__empty">まだ選曲ログがありません。</p>
-        <div v-else class="log-wrap">
-          <table class="log">
-            <thead>
-              <tr>
-                <th>日時</th>
-                <th>局</th>
-                <th>曲</th>
-                <th>セッション</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="t in tracks" :key="t.id">
-                <td class="log__time">{{ fmt(t.played_at) }}</td>
-                <td class="log__freq">
-                  {{ t.frequency != null ? t.frequency.toFixed(1) : '—' }}
-                  <span class="log__st">{{ t.station_callsign }}</span>
-                </td>
-                <td class="log__track">
-                  <a :href="`https://youtu.be/${t.youtube_id}`" target="_blank" rel="noopener">
-                    ♪ {{ t.title || t.youtube_id }}
-                  </a>
-                </td>
-                <td class="log__session">{{ t.session_title || '—' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <p class="block__empty">放送ごとのチャットログは「アーカイブ」に保存されます。</p>
       </section>
 
       <!-- 過去の放送セッション -->
@@ -136,9 +108,8 @@ import { useAuthStore } from '../stores/auth'
 const auth = useAuthStore()
 
 const user = ref(auth.user || {})
-const stats = ref({ stations: 0, sessions: 0, tracks: 0, messages: 0, favorites: 0 })
+const stats = ref({ stations: 0, sessions: 0, messages: 0, favorites: 0 })
 const stations = ref([])
-const tracks = ref([])
 const sessions = ref([])
 const favorites = ref([])
 
@@ -185,14 +156,6 @@ async function loadStations() {
     stations.value = res.stations || []
   } catch (e) {
     stations.value = []
-  }
-}
-async function loadTracks() {
-  try {
-    const res = await api('/me/tracks?limit=100')
-    tracks.value = res.tracks || []
-  } catch (e) {
-    tracks.value = []
   }
 }
 async function loadSessions() {

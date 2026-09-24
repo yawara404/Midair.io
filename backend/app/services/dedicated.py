@@ -19,7 +19,6 @@ from app.models.models import (
     DedicatedTrackLibrary,
     Station,
 )
-from app.services.sessions import record_track
 from app.services.websocket_manager import manager
 
 _DEFAULT_DURATION = 200
@@ -142,9 +141,6 @@ async def advance_station(db: AsyncSession, station: Station, now: Optional[date
     station.track_duration_sec = duration
     station.set_status("live")
     await db.commit()
-
-    # 選曲ログ（再生ログ）にも記録
-    await record_track(db, station.id, video_id, title=title)
 
     # 3. リスナーへ即時同期
     await manager.broadcast(

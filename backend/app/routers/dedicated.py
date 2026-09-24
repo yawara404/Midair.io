@@ -239,6 +239,12 @@ async def admin_approve_application(
     await db.commit()
     await db.refresh(station)
 
+    # 2chライクな最初のスレッドを作成
+    from app.services.threads import ensure_current_thread
+
+    await ensure_current_thread(db, station)
+    await db.commit()
+
     # 初期選曲リストをライブラリへ移行
     import json
 

@@ -2,260 +2,148 @@
   <div class="archive">
     <div class="archive__head">
       <div>
-        <h2>アーカイブ（公開）</h2>
-        <p>予約なしのゲリラ放送も自動で録音されます。<strong>ログイン不要</strong>で誰でも再生できます。</p>
+        <h2>過去スレッド（アーカイブ）</h2>
+        <p>
+          掲示板のスレッドを保存しています（1スレ {{ maxPosts }} 投稿で自動的に新スレへ）。
+          <strong>ログイン不要</strong>で過去の掲示板を読めます。
+        </p>
       </div>
-      <button class="btn btn--ghost" @click="loadSessions">↻ 更新</button>
+      <button class="btn btn--ghost" @click="loadThreads">↻ 更新</button>
+    </div>
+
+    <div v-if="stationFilter" class="archive__filter">
+      <span>表示中: {{ stationFilterName }}</span>
+      <router-link class="archive__filter-clear" to="/archive">すべて表示</router-link>
     </div>
 
     <div class="archive__layout">
       <aside class="archive__list">
         <button
-          v-for="s in sessions"
-          :key="s.id"
+          v-for="t in threads"
+          :key="t.id"
           class="session-card"
-          :class="{ 'is-active': current && current.id === s.id }"
-          @click="openSession(s)"
+          :class="{ 'is-active': current && current.id === t.id }"
+          @click="openThread(t)"
         >
-          <span class="session-card__title">{{ s.session_title }}</span>
-          <span class="session-card__meta">
-            {{ s.frequency != null ? s.frequency.toFixed(1) : '—' }}MHz {{ s.station_callsign || '—' }}
+          <span class="session-card__title">
+            第{{ t.number }}スレ <span v-if="t.is_archived" class="session-card__archived">過去ログ</span>
           </span>
           <span class="session-card__meta">
-            {{ fmt(s.started_at) }} ・ {{ s.total_messages }}件 ・ {{ mmss(s.duration_seconds || 0) }}
+            {{ t.frequency != null ? t.frequency.toFixed(1) : '—' }}MHz {{ t.station_callsign || '—' }}
           </span>
-          <span v-if="s.is_live" class="session-card__live">● 放送中</span>
+          <span class="session-card__meta">
+            {{ fmt(t.created_at) }} ・ {{ t.post_count }} / {{ maxPosts }} 投稿
+          </span>
         </button>
-        <p v-if="!sessions.length" class="archive__empty">まだアーカイブがありません。</p>
+        <p v-if="!threads.length" class="archive__empty">まだスレッドがありません。</p>
       </aside>
 
-      <section v-if="current" class="replay">
-        <div class="replay__head">
-          <span class="replay__title">{{ current.session_title }}</span>
-          <span class="replay__meta">
-            {{ fmt(current.started_at) }} 〜 {{ current.ended_at ? fmtTime(current.ended_at) : '放送中' }}
+      <section v-if="current" class="thread">
+        <div class="thread__head">
+          <span class="thread__no">第{{ current.number }}スレ</span>
+          <span class="thread__title">{{ current.title }}</span>
+          <span class="thread__meta">
+            {{ current.frequency != null ? current.frequency.toFixed(1) : '—' }}MHz
+            ・ {{ messages.length }}投稿
+            ・ {{ fmt(current.created_at) }}〜
           </span>
         </div>
 
-        <!-- タイムシフト操作 -->
-        <div class="replay__controls">
-          <button class="btn btn--primary" @click="togglePlay">
-            {{ playing ? '⏸ 一時停止' : '▶ タイムシフト再生' }}
-          </button>
-          <input
-            class="replay__seek"
-            type="range"
-            min="0"
-            :max="duration"
-            :value="elapsed"
-            @input="seek"
-          />
-          <span class="replay__time">{{ mmss(elapsed) }} / {{ mmss(duration) }}</span>
-        </div>
-
-        <div class="replay__body">
-          <!-- チャットログ（メイン） -->
-          <div ref="logEl" class="replay__log">
-            <div
-              v-for="m in visibleMessages"
-              :key="m.id"
-              class="msg"
-              :class="`msg--${m.message_type}`"
-            >
-              <span class="msg__author">{{ m.author }}</span>
-              <span class="msg__time">+{{ mmss(m.offset_seconds || 0) }}</span>
-              <p class="msg__content">{{ m.content }}</p>
-            </div>
-            <p v-if="!visibleMessages.length" class="archive__empty">
-              再生ボタンを押すと、当時のログが流れてきます。
-            </p>
+        <div ref="logEl" class="thread__log">
+          <div
+            v-for="(m, i) in messages"
+            :key="m.id"
+            class="post"
+            :class="`post--${m.message_type}`"
+          >
+            <span class="post__no">{{ i + 1 }}</span>
+            <span class="post__author">{{ m.author }}</span>
+            <span class="post__time">{{ fmtTime(m.created_at) }}</span>
+            <p class="post__content">{{ m.content }}</p>
           </div>
-
-          <!-- 音源プレイヤー（小さく右上に配置） -->
-          <aside class="replay__player">
-            <div id="archive-player" class="replay__frame"></div>
-            <div v-if="!currentTrack" class="replay__no-track">
-              この時間帯に音源はありません（チャットのみ）。
-            </div>
-          </aside>
+          <p v-if="!messages.length" class="archive__empty">このスレッドにはまだ投稿がありません。</p>
         </div>
       </section>
 
       <section v-else class="archive__placeholder">
-        左のアーカイブを選ぶと、タイムシフト再生が始まります。
+        左のスレッドを選ぶと、当時の掲示板が表示されます。
       </section>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { api } from '../api'
 
-const sessions = ref([])
+const route = useRoute()
+const threads = ref([])
 const current = ref(null)
 const messages = ref([])
-const tracks = ref([])
-const elapsed = ref(0)
-const duration = ref(0)
-const playing = ref(false)
+const maxPosts = ref(1000)
 const logEl = ref(null)
 
-let player = null
-let ytReady = false
-let timer = null
-let loadedTrackId = null
-
-const visibleMessages = computed(() =>
-  messages.value.filter((m) => (m.offset_seconds || 0) <= elapsed.value)
-)
-const currentTrack = computed(() => {
-  let t = null
-  for (const tr of tracks.value) {
-    if (tr.started_offset_sec <= elapsed.value) t = tr
-    else break
-  }
-  return t
+const stationFilter = computed(() => {
+  const s = parseInt(route.query.station, 10)
+  return Number.isFinite(s) ? s : null
+})
+const stationFilterName = computed(() => {
+  const t = threads.value.find((x) => x.station_id === stationFilter.value)
+  return t ? `${t.frequency != null ? t.frequency.toFixed(1) : '—'}MHz ${t.station_callsign}` : '—'
 })
 
 function pad(n) {
   return String(n).padStart(2, '0')
 }
-function mmss(s) {
-  s = Math.max(0, Math.floor(s || 0))
-  return `${pad(Math.floor(s / 60))}:${pad(s % 60)}`
-}
 function fmt(iso) {
   if (!iso) return ''
   const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
   return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 function fmtTime(iso) {
   if (!iso) return ''
   const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-async function loadSessions() {
+async function loadThreads() {
   try {
-    const res = await api('/archives')
-    sessions.value = res.sessions || []
+    const q = stationFilter.value ? `?station=${stationFilter.value}` : ''
+    // station フィルタは station のスレッド一覧を使う
+    if (stationFilter.value) {
+      const res = await api(`/stations/${stationFilter.value}/threads`)
+      threads.value = res.threads || []
+      maxPosts.value = res.max_posts || 1000
+    } else {
+      const res = await api('/threads?limit=200')
+      threads.value = res.threads || []
+      maxPosts.value = res.max_posts || 1000
+    }
   } catch (e) {
     console.error(e)
+    threads.value = []
   }
 }
 
-async function openSession(s) {
-  stopTimer()
-  playing.value = false
-  current.value = s
+async function openThread(t) {
+  current.value = t
+  messages.value = []
   try {
-    const res = await api(`/sessions/${s.id}`)
+    const res = await api(`/threads/${t.id}`)
+    current.value = res.thread || t
     messages.value = res.messages || []
-    tracks.value = res.tracks || []
-    const maxMsg = messages.value.reduce((a, m) => Math.max(a, m.offset_seconds || 0), 0)
-    const maxTrk = tracks.value.reduce((a, t) => Math.max(a, t.started_offset_sec || 0), 0)
-    duration.value = Math.max(res.session.duration_seconds || 0, maxMsg, maxTrk, 1)
-    elapsed.value = 0
-    loadedTrackId = null
-    loadApi()
+    maxPosts.value = res.max_posts || 1000
+    await new Promise((r) => setTimeout(r, 0))
+    if (logEl.value) logEl.value.scrollTop = logEl.value.scrollHeight
   } catch (e) {
     console.error(e)
   }
 }
 
-function loadApi() {
-  if (window.YT && window.YT.Player) {
-    ytReady = true
-    createPlayer()
-    return
-  }
-  if (window.__ytLoading) return
-  window.__ytLoading = true
-  const tag = document.createElement('script')
-  tag.src = 'https://www.youtube.com/iframe_api'
-  document.head.appendChild(tag)
-  window.onYouTubeIframeAPIReady = () => {
-    ytReady = true
-    window.__ytLoading = false
-    createPlayer()
-  }
-}
-
-function createPlayer() {
-  const el = document.getElementById('archive-player')
-  if (!ytReady || !el || player) return
-  player = new window.YT.Player('archive-player', {
-    width: '100%',
-    height: '100%',
-    playerVars: { autoplay: 0, controls: 1, rel: 0 },
-    events: { onReady: () => syncTrack(true) },
-  })
-}
-
-function syncTrack(force) {
-  const t = currentTrack.value
-  if (!t || !player) return
-  const start = Math.max(0, elapsed.value - t.started_offset_sec)
-  if (loadedTrackId !== t.youtube_id) {
-    player.loadVideoById({ videoId: t.youtube_id, startSeconds: start })
-    loadedTrackId = t.youtube_id
-  } else if (force) {
-    player.seekTo(start, true)
-  }
-}
-
-function togglePlay() {
-  playing.value = !playing.value
-  if (playing.value) {
-    syncTrack(true)
-    if (player && player.playVideo) player.playVideo()
-    startTimer()
-  } else {
-    stopTimer()
-    if (player && player.pauseVideo) player.pauseVideo()
-  }
-}
-
-function startTimer() {
-  stopTimer()
-  timer = setInterval(() => {
-    elapsed.value = Math.min(duration.value, elapsed.value + 1)
-    syncTrack(false)
-    if (elapsed.value >= duration.value) togglePlay()
-  }, 1000)
-}
-
-function stopTimer() {
-  if (timer) {
-    clearInterval(timer)
-    timer = null
-  }
-}
-
-function seek(e) {
-  elapsed.value = parseInt(e.target.value, 10) || 0
-  syncTrack(true)
-}
-
-watch(
-  () => visibleMessages.value.length,
-  async () => {
-    await nextTick()
-    if (logEl.value) logEl.value.scrollTop = logEl.value.scrollHeight
-  }
-)
-
-onBeforeUnmount(() => {
-  stopTimer()
-  if (player) {
-    try {
-      player.destroy()
-    } catch (e) {}
-  }
-})
-
-loadSessions()
+onMounted(loadThreads)
 </script>
 
 <style scoped>
@@ -279,6 +167,24 @@ loadSessions()
 .archive__head strong {
   color: var(--green);
 }
+.archive__filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+.archive__filter-clear {
+  color: var(--green);
+  text-decoration: none;
+  border: 1px solid var(--line-strong);
+  padding: 2px 8px;
+}
+.archive__filter-clear:hover {
+  background: var(--green);
+  color: #000;
+}
 .archive__empty {
   color: var(--text-dim);
   font-size: 12px;
@@ -295,6 +201,8 @@ loadSessions()
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-height: 74vh;
+  overflow-y: auto;
 }
 .session-card {
   display: flex;
@@ -320,15 +228,17 @@ loadSessions()
   font-size: 14px;
   color: var(--green);
 }
+.session-card__archived {
+  font-size: 10px;
+  color: var(--text-dim);
+  border: 1px solid var(--line-strong);
+  padding: 1px 5px;
+  margin-left: 4px;
+}
 .session-card__meta {
   font-size: 11px;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
-}
-.session-card__live {
-  font-size: 11px;
-  color: var(--green);
-  animation: blink 1.8s infinite;
 }
 
 .archive__placeholder {
@@ -339,127 +249,89 @@ loadSessions()
   border: 1px dashed var(--line-strong);
 }
 
-.replay {
+/* 過去の掲示板（スレッド） */
+.thread {
   background: var(--panel);
   border: 1px solid var(--line-strong);
   padding: 16px;
 }
-.replay__head {
+.thread__head {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
-  gap: 12px;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line-strong);
 }
-.replay__title {
-  font-size: 16px;
+.thread__no {
+  color: #000;
+  background: var(--green);
+  font-weight: 700;
+  font-size: 12px;
+  padding: 2px 8px;
+}
+.thread__title {
+  font-size: 15px;
   color: var(--green);
-}
-.replay__meta {
-  font-size: 12px;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
-/* ログ（メイン）＋プレイヤー（小）の2カラム */
-.replay__body {
-  display: grid;
-  grid-template-columns: 1fr minmax(220px, 320px);
-  gap: 16px;
-  align-items: start;
-}
-.replay__player {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  background-color: #000;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-  background-size: 16px 16px;
-  border: 1px solid var(--line-strong);
-  overflow: hidden;
-}
-.replay__frame {
-  position: absolute;
-  inset: 0;
-}
-.replay__frame :deep(iframe) {
-  width: 100%;
-  height: 100%;
-}
-.replay__no-track {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: var(--text-dim);
-  text-align: center;
-  padding: 12px;
-}
-.replay__controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 12px 0;
-}
-.replay__seek {
   flex: 1;
   min-width: 0;
-  accent-color: var(--green);
 }
-.replay__time {
+.thread__meta {
   font-size: 12px;
-  color: var(--green);
+  color: var(--text-dim);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
-.replay__log {
-  /* チャットログを主役に：たっぷり表示してスクロール */
-  max-height: 64vh;
+.thread__log {
+  max-height: 66vh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   padding: 12px;
   background: var(--panel-deep);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
 }
-.msg {
+.post {
   border-left: 2px solid var(--line-strong);
-  padding-left: 10px;
+  padding: 2px 0 2px 10px;
 }
-.msg__author {
+.post__no {
+  font-size: 11px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  margin-right: 8px;
+}
+.post__author {
   font-size: 12px;
   color: var(--green);
   margin-right: 8px;
 }
-.msg__time {
+.post__time {
   font-size: 11px;
   color: var(--faint);
   font-variant-numeric: tabular-nums;
 }
-.msg__content {
+.post__content {
   margin: 4px 0 0;
   font-size: 13px;
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
 }
-.msg--dj {
+.post--dj {
   border-left-color: var(--green);
 }
-.msg--dj .msg__content {
+.post--dj .post__content {
   color: var(--green);
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.25; }
 }
 
 @media (max-width: 900px) {
   .archive__layout {
     grid-template-columns: 1fr;
+  }
+  .archive__list {
+    max-height: 40vh;
   }
 }
 
@@ -471,22 +343,7 @@ loadSessions()
   .archive__head .btn {
     align-self: flex-start;
   }
-  .replay__head {
-    flex-direction: column;
-    gap: 4px;
-  }
-  .replay__controls {
-    flex-wrap: wrap;
-  }
-  .replay__seek {
-    order: 3;
-    flex-basis: 100%;
-  }
-  /* モバイルは1カラム（ログ → プレイヤー） */
-  .replay__body {
-    grid-template-columns: 1fr;
-  }
-  .replay__log {
+  .thread__log {
     max-height: 50vh;
   }
 }

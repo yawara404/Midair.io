@@ -164,6 +164,12 @@ class Message(Base):
         nullable=True,
         index=True,
     )
+    # 2chライクなスレッド（掲示板のスレ）
+    thread_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("threads.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     user_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -189,6 +195,7 @@ class Message(Base):
             "id": self.id,
             "station_id": self.station_id,
             "session_id": self.session_id,
+            "thread_id": self.thread_id,
             "offset_seconds": self.offset_seconds,
             "user_id": self.user_id,
             "sender_name": self.sender_name,
@@ -458,4 +465,42 @@ class BroadcastQueue(Base):
             "is_played": self.is_played,
             "sort_order": self.sort_order,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class Thread(Base):
+    """2chライクな掲示板スレッド。
+
+    1スレッドは最大 MAX_THREAD_POSTS（既定1000）投稿で自動的にアーカイブされ、
+    新しいスレッド（次の番号）が自動で作成される。
+    """
+
+    __tablename__ = "threads"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    station_id: Mapped[int] = mapped_column(
+        ForeignKey("stations.id", ondelete="CASCADE"), index=True
+    )
+    # 局ごとの通し番号（第Nスレ）
+    number: Mapped[int] = mapped_column(Integer, default=1)
+    title: Mapped[str] = mapped_column(String(150), default="")
+    post_count: Mapped[int] = mapped_column(Integer, default=0)
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    archived_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    station: Mapped["Station"] = relationship("Station", lazy="selectin")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "station_id": self.station_id,
+            "number": self.number,
+            "title": self.title,
+            "post_count": self.post_count,
+            "is_archived": self.is_archived,
+            "station_callsign": self.station.callsign if self.station else None,
+            "frequency": self.station.frequency if self.station else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "archived_at": self.archived_at.isoformat() if self.archived_at else None,
         }

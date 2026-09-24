@@ -44,6 +44,7 @@ async def init_db() -> None:
         SessionTrack,
         Station,
         StationFavorite,
+        Thread,
         User,
     )
 
@@ -57,15 +58,20 @@ def _migrate_sqlite(conn) -> None:
     from sqlalchemy import inspect
 
     inspector = inspect(conn)
-    if "stations" not in inspector.get_table_names():
-        return
-    existing = {c["name"] for c in inspector.get_columns("stations")}
-    # 専用局まわりで追加したカラム
-    wanted = {
-        "is_dedicated": "BOOLEAN DEFAULT 0",
-        "dedicated_genre": "VARCHAR(50)",
-        "track_duration_sec": "INTEGER DEFAULT 180",
-    }
-    for column, ddl in wanted.items():
-        if column not in existing:
-            conn.exec_driver_sql(f"ALTER TABLE stations ADD COLUMN {column} {ddl}")
+    tables = set(inspector.get_table_names())
+
+    if "stations" in tables:
+        existing = {c["name"] for c in inspector.get_columns("stations")}
+        wanted = {
+            "is_dedicated": "BOOLEAN DEFAULT 0",
+            "dedicated_genre": "VARCHAR(50)",
+            "track_duration_sec": "INTEGER DEFAULT 180",
+        }
+        for column, ddl in wanted.items():
+            if column not in existing:
+                conn.exec_driver_sql(f"ALTER TABLE stations ADD COLUMN {column} {ddl}")
+
+    if "messages" in tables:
+        existing = {c["name"] for c in inspector.get_columns("messages")}
+        if "thread_id" not in existing:
+            conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN thread_id INTEGER")

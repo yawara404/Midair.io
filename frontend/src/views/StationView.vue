@@ -22,6 +22,19 @@
             {{ favorited ? '★' : '☆' }}
           </button>
         </div>
+
+        <!-- スレッド情報（2chライク） -->
+        <div class="thread-bar">
+          <span class="thread-bar__no">第{{ thread ? thread.number : 1 }}スレ</span>
+          <span class="thread-bar__title">{{ currentStation ? currentStation.callsign : '—' }}</span>
+          <span class="thread-bar__count">{{ thread ? thread.post_count : 0 }} / {{ maxPosts }}</span>
+          <router-link
+            v-if="currentStation"
+            class="thread-bar__archive"
+            :to="`/archive?station=${currentStation.id}`"
+          >過去スレ</router-link>
+        </div>
+
         <ChatStream :messages="messages" :my-handle="handle" />
         <MessageInput
           :disabled="!connected"
@@ -40,29 +53,6 @@
           @player-error="onPlayerError"
           @ended="onPlayerEnded"
         />
-
-        <!-- 再生ログ（NOW PLAYING の履歴） -->
-        <section class="tracklog">
-          <div class="tracklog__head">
-            <span>再生ログ</span>
-            <button class="btn btn--ghost tracklog__refresh" @click="loadTrackLog">↻</button>
-          </div>
-          <div class="tracklog__body">
-            <p v-if="!trackLog.length" class="tracklog__empty">まだ曲のログがありません。</p>
-            <a
-              v-for="t in trackLog"
-              :key="t.id"
-              class="tracklog__item"
-              :class="{ 'is-current': t.youtube_id === track.videoId }"
-              :href="`https://youtu.be/${t.youtube_id}`"
-              target="_blank"
-              rel="noopener"
-            >
-              <span class="tracklog__time">{{ fmtTime(t.played_at) }}</span>
-              <MarqueeText class="tracklog__title" :text="t.title || t.youtube_id" />
-            </a>
-          </div>
-        </section>
       </div>
     </div>
   </div>
@@ -75,7 +65,6 @@ import RadioTuner from '../components/RadioTuner.vue'
 import ChatStream from '../components/ChatStream.vue'
 import MessageInput from '../components/MessageInput.vue'
 import RadioPlayer from '../components/RadioPlayer.vue'
-import MarqueeText from '../components/MarqueeText.vue'
 import { api, getToken, wsHost, wsPath } from '../api'
 import { useAuthStore } from '../stores/auth'
 
@@ -85,12 +74,13 @@ const auth = useAuthStore()
 const stations = ref([])
 const frequency = ref(80.0)
 const messages = ref([])
+const thread = ref(null)
+const maxPosts = ref(1000)
 const handle = ref('')
 const connected = ref(false)
 const listenerCount = ref(0)
 const track = ref({ videoId: null, startedAt: null })
 const favorited = ref(false)
-const trackLog = ref([])
 
 let socket = null
 
@@ -140,9 +130,17 @@ function handleEvent(data) {
       break
     case 'message':
       messages.value.push(data)
+      if (thread.value) thread.value.post_count += 1
       break
     case 'message_deleted':
       messages.value = messages.value.filter((m) => m.id !== data.id)
+      break
+    case 'thread_update':
+      // 1000投稿に達して新スレへ切り替わった
+      if (data.thread) {
+        thread.value = data.thread
+        messages.value = []
+      }
       break
     case 'system':
       messages.value.push({
@@ -155,7 +153,6 @@ function handleEvent(data) {
       break
     case 'track_update':
       track.value = { videoId: data.youtube_video_id, startedAt: data.playback_started_at }
-      loadTrackLog()
       break
     case 'live_update':
       if (currentStation.value) {
@@ -180,11 +177,15 @@ function handleEvent(data) {
   }
 }
 
-async function loadHistory(stationId) {
+// 現在スレッドと投稿ログを読み込む
+async function loadThread(stationId) {
   try {
-    const res = await api(`/stations/${stationId}/messages?limit=100`)
+    const res = await api(`/stations/${stationId}/thread`)
+    thread.value = res.thread || null
+    maxPosts.value = res.max_posts || 1000
     messages.value = res.messages || []
   } catch (e) {
+    thread.value = null
     messages.value = []
   }
 }
@@ -199,10 +200,9 @@ async function loadStations() {
     frequency.value = target.frequency
     listenerCount.value = target.listener_count || 0
     track.value = { videoId: target.current_youtube_id, startedAt: target.playback_started_at }
-    await loadHistory(target.id)
+    await loadThread(target.id)
     connect(target.id)
     await refreshFavorite()
-    await loadTrackLog()
   } catch (e) {
     console.error(e)
   }
@@ -214,33 +214,9 @@ function changeFrequency(freq) {
   if (!s) return
   listenerCount.value = s.listener_count || 0
   track.value = { videoId: s.current_youtube_id, startedAt: s.playback_started_at }
-  loadHistory(s.id)
+  loadThread(s.id)
   connect(s.id)
   refreshFavorite()
-  loadTrackLog()
-}
-
-// この局の再生ログ（過去に流れた曲）
-async function loadTrackLog() {
-  const s = currentStation.value
-  if (!s) {
-    trackLog.value = []
-    return
-  }
-  try {
-    const res = await api(`/stations/${s.id}/tracks?limit=50`)
-    trackLog.value = res.tracks || []
-  } catch (e) {
-    trackLog.value = []
-  }
-}
-
-function fmtTime(iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return ''
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 function sendChat(text) {
@@ -368,77 +344,6 @@ onBeforeUnmount(() => {
   overflow-y: auto;
 }
 
-/* 再生ログ */
-.tracklog {
-  background: var(--panel);
-  border: 1px solid var(--line-strong);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.tracklog__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line-strong);
-  font-size: 12px;
-  color: var(--green);
-  letter-spacing: 1px;
-}
-.tracklog__refresh {
-  font-size: 12px;
-  min-width: 34px;
-  min-height: 32px;
-  padding: 4px 10px;
-}
-.tracklog__body {
-  overflow-y: auto;
-  max-height: 320px;
-  display: flex;
-  flex-direction: column;
-}
-.tracklog__empty {
-  color: var(--text-dim);
-  font-size: 12px;
-  padding: 12px;
-}
-.tracklog__item {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  min-height: 40px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--line);
-  text-decoration: none;
-  font-size: 12px;
-}
-.tracklog__item:hover {
-  background: #151515;
-}
-.tracklog__item.is-current {
-  border-left: 2px solid var(--green);
-}
-.tracklog__time {
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.tracklog__title {
-  color: var(--text);
-  flex: 1;
-  min-width: 0;
-}
-/* 内側のマーキー要素にも色を継承させる（リンク既定色を打ち消す） */
-.tracklog__item .tracklog__title,
-.tracklog__item .tracklog__title :deep(.marquee__inner) {
-  color: var(--text);
-  text-decoration: none;
-}
-.tracklog__item.is-current .tracklog__title,
-.tracklog__item.is-current .tracklog__title :deep(.marquee__inner) {
-  color: var(--green);
-}
 .now {
   display: flex;
   align-items: center;
@@ -447,14 +352,15 @@ onBeforeUnmount(() => {
   background: var(--panel);
   border: 1px solid var(--line-strong);
   font-size: 14px;
+  color: var(--hi);
 }
 .now__dot {
   width: 10px;
   height: 10px;
-  background: var(--text-dim);
+  background: var(--dim);
 }
 .now__dot.is-live {
-  background: var(--green);
+  background: var(--hi);
   animation: blink 1.6s infinite;
 }
 .now__bot {
@@ -472,10 +378,59 @@ onBeforeUnmount(() => {
 .now__fav {
   margin-left: 8px;
 }
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.25; }
+
+/* スレッドバー（2chライク） */
+.thread-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  margin: 8px 0 10px;
+  background: var(--panel-deep);
+  border: 1px solid var(--line-strong);
+  font-size: 12px;
+  flex-wrap: wrap;
 }
+.thread-bar__no {
+  color: #000;
+  background: var(--green);
+  font-weight: 700;
+  padding: 2px 8px;
+  letter-spacing: 1px;
+}
+.thread-bar__title {
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.thread-bar__count {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.thread-bar__archive {
+  color: var(--green);
+  text-decoration: none;
+  border: 1px solid var(--line-strong);
+  padding: 2px 8px;
+}
+.thread-bar__archive:hover {
+  background: var(--green);
+  color: #000;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
 @media (max-width: 1080px) {
   /* モバイルはページ全体をスクロールさせ、チャットだけ高さを固定 */
   .station-view {
@@ -505,7 +460,7 @@ onBeforeUnmount(() => {
     font-size: 13px;
     gap: 8px;
     padding: 8px 12px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
   .now__freq {
     margin-left: auto;
@@ -513,10 +468,6 @@ onBeforeUnmount(() => {
   .station-view__stream {
     height: 80vh;
     min-height: 520px;
-  }
-  /* 再生ログは高さを抑える */
-  .tracklog__body {
-    max-height: 220px;
   }
 }
 </style>

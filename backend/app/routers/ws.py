@@ -17,7 +17,7 @@ from app.core.utils import parse_youtube_id
 from app.models.models import Message, Station, User
 from app.services.ai_dj import generate_dj_line
 from app.services.discord_sync import send_to_discord
-from app.services.sessions import current_offset, record_track
+from app.services.sessions import current_offset
 from app.services.websocket_manager import manager
 
 router = APIRouter()
@@ -36,12 +36,18 @@ async def _persist_message(
     is_broadcaster: bool = False,
     youtube_id: Optional[str] = None,
 ) -> dict:
+    from app.services.threads import ensure_current_thread, register_post
+
     async with async_session_factory() as session:
+        station = await session.get(Station, station_id)
+        # 2chライクなスレッドへ紐づけ（上限で自動アーカイブ＋新スレ）
+        thread = await ensure_current_thread(session, station) if station else None
         # 放送セッションに自動バインド（offset = セッション開始からの経過秒）
         session_id, offset = await current_offset(session, station_id)
         msg = Message(
             station_id=station_id,
             session_id=session_id,
+            thread_id=thread.id if thread else None,
             offset_seconds=offset,
             user_id=user_id,
             sender_name=sender_name,
@@ -51,9 +57,17 @@ async def _persist_message(
             is_broadcaster=is_broadcaster,
         )
         session.add(msg)
+        rolled = await register_post(session, station, thread) if thread else None
         await session.commit()
         await session.refresh(msg)
-        return msg.to_dict()
+        payload = msg.to_dict()
+
+    if rolled is not None:
+        # 新スレに切り替わったことを全クライアントへ通知
+        await manager.broadcast(
+            station_id, {"type": "thread_update", "thread": rolled.to_dict()}
+        )
+    return payload
 
 
 async def _broadcast_track(
@@ -174,8 +188,6 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
                         station.current_youtube_id = video_id
                         station.playback_started_at = _now()
                         await session.commit()
-                        # 選曲ログ（プロフィールの「過去の曲」）にも記録する
-                        await record_track(session, station_id, video_id)
                         started_iso = station.playback_started_at.isoformat()
                     payload = await _persist_message(
                         station_id, handle, f"曲をオンエアしました: https://youtu.be/{video_id}",

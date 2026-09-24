@@ -22,7 +22,7 @@ from app.models.models import (
     User,
 )
 from app.routers.frequencies import broadcast_frequency_status
-from app.services.sessions import open_session, record_track
+from app.services.sessions import open_session
 from app.services.websocket_manager import manager
 
 router = APIRouter(prefix="/api", tags=["stations"])
@@ -213,6 +213,11 @@ async def _launch_station(data: StationCreate, user: User, db: AsyncSession) -> 
     db.add(station)
     await db.commit()
     await db.refresh(station)
+    # 2chライクな最初のスレッド（第1スレ）を作成
+    from app.services.threads import ensure_current_thread
+
+    await ensure_current_thread(db, station)
+    await db.commit()
     # 開局したらパーソナリティ権限へ昇格
     if user.role == "listener":
         user.role = "broadcaster"
@@ -284,10 +289,9 @@ async def station_set_youtube(
     station.playback_started_at = datetime.now()
     station.set_status("live")
     await db.commit()
-    # 停波中から BGM で復帰した場合はセッションを開始し、曲を履歴に記録する
+    # 停波中から BGM で復帰した場合はセッションを開始する
     if not was_live:
         await open_session(db, station)
-    await record_track(db, station_id, video_id)
     started_iso = station.playback_started_at.isoformat()
     await manager.broadcast(
         station_id,

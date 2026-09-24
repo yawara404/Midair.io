@@ -18,10 +18,11 @@
 - **再生ログ** — ステーション画面の NOW PLAYING 欄に、その局で流れた曲の履歴を表示。
 - **AI ラジオ DJ Bot** — 会話が途切れた際や「DJを呼ぶ」に応じて自動応答（Gemini API。未設定時はルールベース）。
 
-### 番組表・アーカイブ
+### 番組表・掲示板アーカイブ
 
 - **番組表（タイムテーブル）** — 日別のラジオ番組表（EPG風）。番組の開始/終了に合わせて自動で ON AIR / 停波。
-- **公開オートアーカイブ** — 予約なしのゲリラ放送も自動でセッション記録。ログイン不要で当時のチャットと選曲を**タイムシフト再生**。
+- **2chライクなスレッド** — 各局の掲示板はスレッド制。**1スレッド 1000 投稿**に達すると自動でアーカイブされ、次のスレッドが自動作成されます（第Nスレ）。
+- **過去スレッド（アーカイブ）** — 過去の掲示板画面をそのまま閲覧できます（ログイン不要）。投稿番号・投稿者・時刻付き。
 - **お気に入り周波数** — リスナーのプリセット保存。
 
 ### 開局（パーソナリティ）
@@ -88,7 +89,7 @@
 
 ### データモデル（主なテーブル）
 
-`users` / `stations` / `programs` / `messages` / `station_favorites` / `reservations` /
+`users` / `stations` / `programs` / `messages` / `threads` / `station_favorites` / `reservations` /
 `broadcast_sessions` / `session_tracks` / `bot_stations` /
 `dedicated_applications` / `dedicated_track_library` / `broadcast_queue`
 

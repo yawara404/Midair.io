@@ -27,6 +27,7 @@ from app.routers import (
     me,
     programs,
     stations,
+    threads,
     ws,
 )
 from app.routers.frequencies import broadcast_frequency_status
@@ -354,6 +355,12 @@ async def _lifecycle_loop() -> None:
 async def lifespan(app: FastAPI):
     await init_db()
     await _seed()
+    # 全ステーションに現在スレッドがあることを保証
+    from app.core.database import async_session_factory as _asf
+    from app.services.threads import ensure_all_stations
+
+    async with _asf() as _session:
+        await ensure_all_stations(_session)
     dj_task = asyncio.create_task(_dj_loop())
     life_task = asyncio.create_task(_lifecycle_loop())
     bot_task = asyncio.create_task(_dj_bot_loop())
@@ -430,6 +437,7 @@ app.include_router(archives.router)
 app.include_router(me.router)
 app.include_router(bot.router)
 app.include_router(dedicated.router)
+app.include_router(threads.router)
 app.include_router(ws.router)
 
 
