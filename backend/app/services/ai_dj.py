@@ -1,9 +1,14 @@
-"""AIラジオDJ / AIチャットbot。Gemini API が設定されていれば生成、なければルールベース。
+"""AIラジオDJ / AIチャットbot（自由思考型）。
 
-- ステーションごとのキャラクター設定（ai_dj_prompt）を `persona` として渡せる。
-- リスナーの発言に返信する「チャットbot」モード（Discordのチャットbot的な挙動）に対応。
+LLM（Gemini API）で、キャラクター設定（ai_dj_prompt）と直前の会話を踏まえて
+その場で文章を生成する。定型文のリストは使わない。
+
+- チャットbot: リスナーの発言に、文脈を踏まえて自由に返信する。
+- アイドルDJ: 会話が途切れたときに、キャラクターとして自由に話しかける。
+
+Gemini API が未設定・失敗時は None を返し、呼び出し側は「何も投稿しない」。
+（＝定型文での代替はしない）
 """
-import random
 import time
 from typing import Optional
 
@@ -11,70 +16,70 @@ import httpx
 
 from app.core.config import settings
 
-_FALLBACK_LINES = [
-    "……ふむ。今夜もまた、眠れない夜がひとつ。そこの君、周波数は合ってるかい。",
-    "お便りありがとう。DJのボクが代わりに読ませてもらうよ。",
-    "静かな夜だね。リクエスト曲、まだまだ募集中さ。",
-    "3時を回った。ここからが本番……なんてね。",
-    "受信感度は良好。君のそのつぶやき、確かに届いてるよ。",
-    "夜の底で、同じ周波数を探してる。不思議な縁だと思わないかい。",
-]
-
-# チャットbotのフォールバック（Gemini未設定時）。オタクJKっぽい相づち。
-_CHAT_FALLBACK = [
-    "えっ、それめっちゃ分かる〜！うちもそれ好き！",
-    "うわ〜、それってアニメのやつですか？詳しく聞きたい！",
-    "きゃ〜、先輩それ知ってるんですか！？推しポイント高い…！",
-    "それな〜！深夜にその話題はアツいｗ",
-    "うちも今それ考えてたとこ！シンクロじゃん！",
-    "え、まって、その曲ボカロですか？神選曲〜",
-    "ふぁ〜、眠くなってきたけど、まだ起きてます…！",
-    "先輩、その話もっと聞かせてください！(｡･ω･｡)",
-    "いいですね〜！今日もいい夜になってきた！",
-    "それってあの作品のやつですよね？うちもハマってます！",
-]
-
-_DJ_PROMPT = """あなたは深夜ラジオ番組「{program}」のDJです。リスナーとリアルタイムに雑談をしています。
-落ち着いた、少し気だるい口調で、日本語で1〜3文だけ返してください。挨拶や説教は不要です。
-直近の会話: {context}
-DJのひとこと:"""
-
-_PERSONA_PROMPT = """あなたは深夜ラジオ局のAI DJです。以下のキャラクター設定に従って、リスナーとリアルタイムに雑談をします。
+_DJ_PROMPT = """あなたは配信「{program}」のDJです。以下のキャラクター設定になりきって、
+リスナーに今この瞬間のひとことを、自由に考えて話してください。定型文の暗唱はしないこと。
 キャラクター設定: {persona}
-番組名: {program}
-直近の会話: {context}
+直前の会話（参考。無ければ空）:
+{context}
 DJのひとこと（日本語で1〜3文）:"""
 
-# チャットbot（リスナーの発言に返信する）
-_CHAT_PROMPT = """あなたは配信「{program}」に常駐するAIチャットbotです。以下のキャラクター設定に従い、
-リスナーの発言に、Discordのチャットbotのように気軽に返信してください。
+_CHAT_PROMPT = """あなたは配信「{program}」に常駐するAIチャットbotです。以下のキャラクター設定になりきり、
+Discordのチャットbotのように、リスナーの発言へ自然に返信してください。
+相手の発言の内容を踏まえて、毎回ちがう言い方で、自由に考えて返すこと（定型文の暗唱はしない）。
 キャラクター設定: {persona}
+直前の会話（参考。無ければ空）:
+{context}
 リスナーの発言: {message}
-返信（日本語で1〜2文。絵文字や顔文字を少し混ぜてOK。同じ語尾の繰り返しは避ける）:"""
+返信（日本語で1〜2文。絵文字や顔文字を少し混ぜてOK）:"""
+
+
+async def _call_gemini(prompt: str) -> str:
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{settings.gemini_model}:generateContent?key={settings.gemini_api_key}"
+    )
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(url, json=payload, timeout=25)
+        resp.raise_for_status()
+        data = resp.json()
+        text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        return text
 
 
 async def generate_dj_line(
     program: str, context: str = "", persona: Optional[str] = None
-) -> str:
-    """DJのひとこと を生成する。API未設定・失敗時はフォールバック。"""
-    if settings.gemini_api_key:
-        try:
-            return await _call_gemini(program, context, persona)
-        except Exception:
-            pass
-    return random.choice(_FALLBACK_LINES)
+) -> Optional[str]:
+    """アイドルDJのひとことをLLMで自由生成する。失敗時は None。"""
+    if not settings.gemini_api_key:
+        return None
+    prompt = _DJ_PROMPT.format(
+        program=program or "Midair.io",
+        persona=persona or "深夜ラジオのDJ。落ち着いた口調。",
+        context=context or "（まだ誰もいない）",
+    )
+    try:
+        return await _call_gemini(prompt)
+    except Exception:
+        return None
 
 
 async def generate_chat_reply(
-    program: str, persona: Optional[str], message: str
-) -> str:
-    """リスナーの発言への返信を生成する。API未設定・失敗時はフォールバック。"""
-    if settings.gemini_api_key:
-        try:
-            return await _call_gemini_chat(program, persona, message)
-        except Exception:
-            pass
-    return random.choice(_CHAT_FALLBACK)
+    program: str, persona: Optional[str], message: str, context: str = ""
+) -> Optional[str]:
+    """リスナーの発言への返信をLLMで自由生成する。失敗時は None。"""
+    if not settings.gemini_api_key:
+        return None
+    prompt = _CHAT_PROMPT.format(
+        program=program or "Midair.io",
+        persona=persona or "明るく親しみやすいチャットbot",
+        message=message or "（無言）",
+        context=context or "（なし）",
+    )
+    try:
+        return await _call_gemini(prompt)
+    except Exception:
+        return None
 
 
 # 局ごとの最終返信時刻（連投を防ぐ）
@@ -87,53 +92,13 @@ async def maybe_chat_reply(
     persona: Optional[str],
     enabled: bool,
     message: str,
+    context: str = "",
 ) -> Optional[str]:
-    """チャットbotが有効な局で、クールダウンを考慮して返信を生成する。"""
+    """チャットbotが有効な局で、クールダウンを考慮して自由生成の返信を返す。"""
     if not enabled:
         return None
     now = time.time()
     if now - _last_reply.get(station_id, 0.0) < max(0, settings.bot_reply_cooldown_seconds):
         return None
     _last_reply[station_id] = now
-    return await generate_chat_reply(program, persona, message)
-
-
-async def _call_gemini(program: str, context: str, persona: Optional[str]) -> str:
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{settings.gemini_model}:generateContent?key={settings.gemini_api_key}"
-    )
-    if persona:
-        text = _PERSONA_PROMPT.format(
-            persona=persona,
-            program=program or "Midair.io",
-            context=context or "（まだ誰もいない）",
-        )
-    else:
-        text = _DJ_PROMPT.format(
-            program=program or "Midair.io",
-            context=context or "（まだ誰もいない）",
-        )
-    return await _generate(url, text)
-
-
-async def _call_gemini_chat(program: str, persona: Optional[str], message: str) -> str:
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{settings.gemini_model}:generateContent?key={settings.gemini_api_key}"
-    )
-    text = _CHAT_PROMPT.format(
-        program=program or "Midair.io",
-        persona=persona or "明るく親しみやすいチャットbot",
-        message=message or "（無言）",
-    )
-    return await _generate(url, text)
-
-
-async def _generate(url: str, text: str) -> str:
-    payload = {"contents": [{"parts": [{"text": text}]}]}
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(url, json=payload, timeout=20)
-        resp.raise_for_status()
-        data = resp.json()
-        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    return await generate_chat_reply(program, persona, message, context=context)

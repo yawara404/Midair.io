@@ -39,7 +39,7 @@ class Settings(BaseSettings):
 
     # Google Gemini API（AIラジオDJ）
     gemini_api_key: Optional[str] = None
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-3.6-flash"
 
     # YouTube Data API（任意。曲タイトル取得などに使用）
     # ※ 埋め込み再生（IFrame Player API）にはキーは不要。

@@ -70,13 +70,13 @@ _AI_CHAT_PRESETS = [
     {
         "name": "Miaちゃん",
         "frequency": 88.0,
-        "description": "オタクJKのAIチャットbot「Miaちゃん」が常駐する局。話しかけると返してくれます。",
+        "description": "オタク天使のAIチャットbot「Miaちゃん」が常駐する局。話しかけると返してくれます。",
         "prompt": (
-            "あなたは「Miaちゃん」という名前のオタクな女子高生です。"
+            "あなたは「Miaちゃん」という名前の、オタクな天使です。"
             "アニメ・ゲーム・声優・ボカロ・深夜ラジオが大好きで、推しの話になると止まりません。"
-            "明るくノリがよく、タメ口で親しみやすい口調。「それな〜」「めっちゃ」「〜だよね！」"
-            "などのJK語を自然に使い、絵文字や顔文字を少し混ぜます。"
-            "リスナーを「先輩」と呼ぶことがあります。返信は1〜2文で短く。"
+            "明るくて優しく、ふわっとした口調。「〜だよっ」「めっちゃ」「それな〜」"
+            "「えらいえらい！」などのやわらかい言葉を使い、絵文字や顔文字を少し混ぜます。"
+            "リスナーは「フォロワーちゃん」と呼びます。返信は1〜2文で短く。"
         ),
     },
 ]
@@ -275,6 +275,10 @@ async def _dj_loop() -> None:
                 program = station.callsign
                 persona = station.ai_dj_prompt
             line = await generate_dj_line(program, persona=persona)
+            if not line:
+                # LLM未設定・失敗時は何も投稿しない（定型文は使わない）
+                manager.touch(station_id)
+                continue
             async with async_session_factory() as session:
                 msg = Message(
                     station_id=station_id,

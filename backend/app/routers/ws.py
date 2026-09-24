@@ -173,12 +173,30 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
                 await send_to_discord(
                     settings.discord_webhook_url, content, f"[{station_name}] {handle}"
                 )
-                # AIチャットbot（例: Miaちゃん）の返信
+                # AIチャットbot（例: Miaちゃん）の返信（自由思考・文脈つき）
                 try:
                     from app.services.ai_dj import maybe_chat_reply
 
+                    context = ""
+                    async with async_session_factory() as cs:
+                        rows = (
+                            await cs.execute(
+                                select(Message)
+                                .where(Message.station_id == station_id)
+                                .order_by(Message.id.desc())
+                                .limit(6)
+                            )
+                        ).scalars().all()
+                        context = "\n".join(
+                            f"{m.sender_name}: {m.content}" for m in reversed(rows)
+                        )
                     reply = await maybe_chat_reply(
-                        station_id, station_name, ai_dj_prompt, ai_dj_enabled, content
+                        station_id,
+                        station_name,
+                        ai_dj_prompt,
+                        ai_dj_enabled,
+                        content,
+                        context=context,
                     )
                     if reply:
                         bot_payload = await _persist_message(
@@ -228,10 +246,11 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
             elif msg_type == "dj_call":
                 context = (data.get("content") or "").strip()
                 line = await generate_dj_line(station_name, context, ai_dj_prompt)
-                payload = await _persist_message(
-                    station_id, "DJ", line, is_dj=True
-                )
-                await manager.broadcast(station_id, {"type": "message", **payload})
+                if line:
+                    payload = await _persist_message(
+                        station_id, "DJ", line, is_dj=True
+                    )
+                    await manager.broadcast(station_id, {"type": "message", **payload})
 
             else:
                 await websocket.send_json(
