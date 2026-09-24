@@ -92,7 +92,7 @@ function wsUrl(stationId) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'
   const token = getToken()
   const qs = token ? `?token=${encodeURIComponent(token)}` : ''
-  return `${proto}://${wsHost()}/ws/${stationId}${qs}`
+  return `${proto}://${wsHost()}${wsPath()}/${stationId}${qs}`
 }
 
 function connect(stationId) {
