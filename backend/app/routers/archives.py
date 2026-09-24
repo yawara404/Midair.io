@@ -8,17 +8,21 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.models.models import BroadcastSession, Message, SessionTrack
+from app.models.models import BroadcastSession, Message, SessionTrack, Station
 
 router = APIRouter(prefix="/api", tags=["archives"])
 
 
 @router.get("/archives")
 async def list_archives(limit: int = 50, db: AsyncSession = Depends(get_db)):
-    """公開アーカイブ（全ステーションの放送セッション）を新しい順に返す。"""
+    """公開アーカイブ（全ステーションの放送セッション）を新しい順に返す。
+
+    ステーションが削除済みの孤立セッションは除外する（frequency/callsign が null になるため）。
+    """
     limit = max(1, min(limit, 200))
     result = await db.execute(
         select(BroadcastSession)
+        .join(Station, BroadcastSession.station_id == Station.id)
         .where(BroadcastSession.is_public.is_(True))
         .order_by(BroadcastSession.started_at.desc(), BroadcastSession.id.desc())
         .limit(limit)

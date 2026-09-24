@@ -19,7 +19,7 @@
         >
           <span class="session-card__title">{{ s.session_title }}</span>
           <span class="session-card__meta">
-            {{ s.frequency.toFixed(1) }}MHz {{ s.station_callsign }}
+            {{ s.frequency != null ? s.frequency.toFixed(1) : '—' }}MHz {{ s.station_callsign || '—' }}
           </span>
           <span class="session-card__meta">
             {{ fmt(s.started_at) }} ・ {{ s.total_messages }}件 ・ {{ mmss(s.duration_seconds || 0) }}
@@ -357,7 +357,10 @@ loadSessions()
 }
 .replay__player {
   position: relative;
+  /* 高さ上限 46vh を基準に 16:9 の幅を逆算（巨大化を防ぎログが見える） */
+  width: min(100%, calc(46vh * 16 / 9));
   aspect-ratio: 16 / 9;
+  margin: 0 auto;
   background-color: #000;
   background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
   background-size: 16px 16px;
@@ -400,7 +403,7 @@ loadSessions()
   white-space: nowrap;
 }
 .replay__log {
-  max-height: 320px;
+  max-height: 42vh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
