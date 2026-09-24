@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     dj_enabled: bool = True
     dj_idle_seconds: int = 45
 
+    # AIチャットbot（リスナーの発言に返信）のクールダウン秒数
+    bot_reply_cooldown_seconds: int = 12
+
     # 自動DJ局（DJ BOT）— 流行りの曲からランダムに流し続ける常時オンエア局
     dj_bot_enabled: bool = True
     dj_bot_frequency: float = 84.0

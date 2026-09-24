@@ -65,6 +65,22 @@ _SEED_STATIONS = [
     (88.9, "Midair.io 最終便", "終電のあと、一番星まで。最終周波数。"),
 ]
 
+# AIチャットbot常駐局（プリセット）。ai_dj_enabled + キャラ設定で、話しかけると返信する。
+_AI_CHAT_PRESETS = [
+    {
+        "name": "Miaちゃん",
+        "frequency": 88.0,
+        "description": "オタクJKのAIチャットbot「Miaちゃん」が常駐する局。話しかけると返してくれます。",
+        "prompt": (
+            "あなたは「Miaちゃん」という名前のオタクな女子高生です。"
+            "アニメ・ゲーム・声優・ボカロ・深夜ラジオが大好きで、推しの話になると止まりません。"
+            "明るくノリがよく、タメ口で親しみやすい口調。「それな〜」「めっちゃ」「〜だよね！」"
+            "などのJK語を自然に使い、絵文字や顔文字を少し混ぜます。"
+            "リスナーを「先輩」と呼ぶことがあります。返信は1〜2文で短く。"
+        ),
+    },
+]
+
 
 async def _seed() -> None:
     """admin ユーザーと公式ステーションを初期投入する。"""
@@ -102,6 +118,40 @@ async def _seed() -> None:
 
         # 自動DJ局（DJ BOT / Vocaloid BOT）を用意する
         await _ensure_bot_stations(session, admin)
+        # AIチャットbot常駐局（Miaちゃん）を用意する
+        await _ensure_ai_chat_stations(session, admin)
+
+
+async def _ensure_ai_chat_stations(session, admin: User) -> None:
+    """AIチャットbotが常駐するプリセット局を用意する。"""
+    for preset in _AI_CHAT_PRESETS:
+        station = (
+            await session.execute(
+                select(Station).where(Station.callsign == preset["name"])
+            )
+        ).scalars().first()
+        if station is not None:
+            continue
+        used = {
+            round(float(f), 1)
+            for f in (await session.execute(select(Station.frequency))).scalars().all()
+        }
+        freq = round(float(preset["frequency"]), 1)
+        while freq in used and freq <= settings.station_freq_max + 1e-9:
+            freq = round(freq + 0.1, 1)
+        station = Station(
+            owner_id=admin.id,
+            frequency=freq,
+            callsign=preset["name"],
+            description=preset["description"],
+            status="live",
+            ai_dj_enabled=True,
+            ai_dj_prompt=preset["prompt"],
+        )
+        session.add(station)
+        await session.commit()
+        await session.refresh(station)
+        await open_session(session, station, title=f"{preset['name']} 放送")
 
 
 async def _ensure_bot_stations(session, admin: User) -> None:

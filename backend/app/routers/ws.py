@@ -111,6 +111,7 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
         owner_id = station.owner_id
         station_name = station.callsign
         ai_dj_prompt = station.ai_dj_prompt
+        ai_dj_enabled = bool(station.ai_dj_enabled)
         current_track = {
             "youtube_video_id": station.current_youtube_id,
             "playback_started_at": (
@@ -172,6 +173,26 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
                 await send_to_discord(
                     settings.discord_webhook_url, content, f"[{station_name}] {handle}"
                 )
+                # AIチャットbot（例: Miaちゃん）の返信
+                try:
+                    from app.services.ai_dj import maybe_chat_reply
+
+                    reply = await maybe_chat_reply(
+                        station_id, station_name, ai_dj_prompt, ai_dj_enabled, content
+                    )
+                    if reply:
+                        bot_payload = await _persist_message(
+                            station_id, "AI", reply, is_dj=True
+                        )
+                        await manager.broadcast(
+                            station_id, {"type": "message", **bot_payload}
+                        )
+                        # Discord 連携時は bot 返信も送る（Discordのチャットbot的に）
+                        await send_to_discord(
+                            settings.discord_webhook_url, reply, f"[{station_name}] Mia"
+                        )
+                except Exception:
+                    pass
 
             elif msg_type == "youtube_request":
                 raw = data.get("url") or data.get("video_id") or ""
