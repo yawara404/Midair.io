@@ -17,7 +17,7 @@ from app.core.utils import parse_youtube_id
 from app.models.models import Message, Station, User
 from app.services.ai_dj import generate_dj_line
 from app.services.discord_sync import send_to_discord
-from app.services.sessions import current_offset
+from app.services.sessions import current_offset, record_track
 from app.services.websocket_manager import manager
 
 router = APIRouter()
@@ -247,6 +247,8 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
                         station.current_youtube_id = video_id
                         station.playback_started_at = _now()
                         await session.commit()
+                        # 選曲ログに記録
+                        await record_track(session, station_id, video_id)
                         started_iso = station.playback_started_at.isoformat()
                     payload = await _persist_message(
                         station_id, handle, f"曲をオンエアしました: https://youtu.be/{video_id}",

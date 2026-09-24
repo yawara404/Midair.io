@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.models import Station
 from app.services.discord_sync import send_to_discord
+from app.services.sessions import record_track
 from app.services.trending import random_track
 from app.services.websocket_manager import manager
 from app.services.youtube import fetch_video_duration
@@ -79,6 +80,9 @@ async def play_next(db: AsyncSession, station: Station) -> bool:
     station.current_youtube_id = pick["youtube_id"]
     station.playback_started_at = datetime.now()
     await db.commit()
+
+    # 選曲ログに記録
+    await record_track(db, station.id, pick["youtube_id"], title=pick.get("title"))
 
     started_iso = station.playback_started_at.isoformat()
     await manager.broadcast(

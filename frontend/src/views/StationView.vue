@@ -53,6 +53,7 @@
           @player-error="onPlayerError"
           @ended="onPlayerEnded"
         />
+        <PlayLog :station-id="currentStation ? currentStation.id : null" />
       </div>
     </div>
   </div>
@@ -65,6 +66,7 @@ import RadioTuner from '../components/RadioTuner.vue'
 import ChatStream from '../components/ChatStream.vue'
 import MessageInput from '../components/MessageInput.vue'
 import RadioPlayer from '../components/RadioPlayer.vue'
+import PlayLog from '../components/PlayLog.vue'
 import { api, getToken, wsHost, wsPath } from '../api'
 import { useAuthStore } from '../stores/auth'
 

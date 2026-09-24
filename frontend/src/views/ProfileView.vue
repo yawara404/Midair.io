@@ -23,6 +23,7 @@
       <div class="stats">
         <div class="stat"><span class="stat__num">{{ stats.stations }}</span><span class="stat__label">保有局</span></div>
         <div class="stat"><span class="stat__num">{{ stats.sessions }}</span><span class="stat__label">放送セッション</span></div>
+        <div class="stat"><span class="stat__num">{{ stats.tracks }}</span><span class="stat__label">曲ログ</span></div>
         <div class="stat"><span class="stat__num">{{ stats.messages }}</span><span class="stat__label">メッセージ</span></div>
         <div class="stat"><span class="stat__num">{{ stats.favorites }}</span><span class="stat__label">お気に入り</span></div>
       </div>
@@ -50,6 +51,42 @@
             <button v-else class="btn btn--ghost" @click="setAir(s, 'off-air')">OFF AIR</button>
             <button class="btn btn--ghost" @click="closeStation(s)">廃局</button>
           </div>
+        </div>
+      </section>
+
+      <!-- 自分の過去の曲ログ -->
+      <section class="block">
+        <div class="block__head">
+          <h3>自分の過去の曲ログ</h3>
+          <button class="btn btn--ghost" @click="loadTracks">↻ 更新</button>
+        </div>
+        <p v-if="!tracks.length" class="block__empty">まだ選曲ログがありません。</p>
+        <div v-else class="log-wrap">
+          <table class="log">
+            <thead>
+              <tr>
+                <th>日時</th>
+                <th>局</th>
+                <th>曲</th>
+                <th>セッション</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="t in tracks" :key="t.id">
+                <td class="log__time" data-label="日時">{{ fmt(t.played_at) }}</td>
+                <td class="log__freq" data-label="局">
+                  {{ t.frequency != null ? t.frequency.toFixed(1) : '—' }}
+                  <span class="log__st">{{ t.station_callsign }}</span>
+                </td>
+                <td class="log__track" data-label="曲">
+                  <a :href="`https://youtu.be/${t.youtube_id}`" target="_blank" rel="noopener">
+                    ♪ {{ t.title || t.youtube_id }}
+                  </a>
+                </td>
+                <td class="log__session" data-label="セッション">{{ t.session_title || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -108,8 +145,9 @@ import { useAuthStore } from '../stores/auth'
 const auth = useAuthStore()
 
 const user = ref(auth.user || {})
-const stats = ref({ stations: 0, sessions: 0, messages: 0, favorites: 0 })
+const stats = ref({ stations: 0, sessions: 0, tracks: 0, messages: 0, favorites: 0 })
 const stations = ref([])
+const tracks = ref([])
 const sessions = ref([])
 const favorites = ref([])
 
@@ -156,6 +194,14 @@ async function loadStations() {
     stations.value = res.stations || []
   } catch (e) {
     stations.value = []
+  }
+}
+async function loadTracks() {
+  try {
+    const res = await api('/me/tracks?limit=100')
+    tracks.value = res.tracks || []
+  } catch (e) {
+    tracks.value = []
   }
 }
 async function loadSessions() {
@@ -375,7 +421,7 @@ onMounted(async () => {
   min-width: 520px;
   border-collapse: collapse;
 }
-/* モバイルでは曲ログを縦積みにして見切れをなくす */
+/* モバイルでは曲ログをカード風の縦積みにして見切れをなくす */
 @media (max-width: 640px) {
   .log-wrap {
     overflow-x: visible;
@@ -383,33 +429,47 @@ onMounted(async () => {
   .log {
     min-width: 0;
     width: 100%;
+    border-collapse: separate;
   }
   .log thead {
     display: none;
   }
   .log tr {
     display: block;
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--line);
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: rgba(255, 255, 255, 0.02);
   }
   .log td {
     display: block;
     border: none;
     padding: 2px 0;
+    white-space: normal;
   }
-  .log__freq,
-  .log__time {
-    display: inline;
-    margin-right: 10px;
+  .log td::before {
+    content: attr(data-label);
+    display: inline-block;
+    min-width: 64px;
+    color: var(--text-dim);
+    font-size: 10px;
+    letter-spacing: 1px;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  .log__time,
+  .log__freq {
+    white-space: normal;
   }
   /* 曲リンクをタップしやすい高さに */
   .log__track a {
     display: block;
-    padding: 6px 0;
+    padding: 4px 0;
     font-size: 13px;
+    word-break: break-word;
   }
   .log__session {
-    display: block;
     font-size: 11px;
   }
 }

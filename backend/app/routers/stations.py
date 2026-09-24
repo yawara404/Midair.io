@@ -22,7 +22,7 @@ from app.models.models import (
     User,
 )
 from app.routers.frequencies import broadcast_frequency_status
-from app.services.sessions import open_session
+from app.services.sessions import open_session, record_track
 from app.services.websocket_manager import manager
 
 router = APIRouter(prefix="/api", tags=["stations"])
@@ -292,6 +292,8 @@ async def station_set_youtube(
     # 停波中から BGM で復帰した場合はセッションを開始する
     if not was_live:
         await open_session(db, station)
+    # 選曲ログに記録
+    await record_track(db, station_id, video_id)
     started_iso = station.playback_started_at.isoformat()
     await manager.broadcast(
         station_id,
