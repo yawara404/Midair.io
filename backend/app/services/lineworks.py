@@ -27,6 +27,13 @@ _token: dict = {"value": None, "exp": 0.0}
 
 
 def _private_key() -> Optional[str]:
+    # ファイル指定が優先（PEM をそのまま読む）
+    if settings.lineworks_private_key_file:
+        try:
+            with open(settings.lineworks_private_key_file, "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except Exception:
+            pass
     key = settings.lineworks_private_key
     if not key:
         return None
@@ -39,7 +46,7 @@ def is_configured() -> bool:
         settings.lineworks_enabled
         and settings.lineworks_client_id
         and settings.lineworks_service_account
-        and settings.lineworks_private_key
+        and (settings.lineworks_private_key or settings.lineworks_private_key_file)
         and settings.lineworks_bot_id
         and settings.lineworks_channel_id
     )

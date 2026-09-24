@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     lineworks_service_account: Optional[str] = None
     # PEM秘密鍵（改行はそのまま、または \n エスケープ可）
     lineworks_private_key: Optional[str] = None
+    # 秘密鍵をファイルで指定する場合（.pem/.key のパス）。上の値より優先はしません。
+    lineworks_private_key_file: Optional[str] = None
     lineworks_bot_id: Optional[str] = None
     lineworks_channel_id: Optional[str] = None
     # 連携する Midair の局（コールサイン）
