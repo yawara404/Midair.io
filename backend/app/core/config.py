@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     # CORS 許可オリジン
     cors_origins: str = "*"
 
+    # サブパス配信時の API ルート（例: /Midair.io）。ローカル/root 配信では空。
+    root_path: str = ""
+
     model_config = SettingsConfigDict(
         env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",

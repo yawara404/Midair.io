@@ -405,7 +405,7 @@ def _start_dedicated_scheduler():
     return scheduler
 
 
-app = FastAPI(title=settings.app_name, lifespan=lifespan)
+app = FastAPI(title=settings.app_name, lifespan=lifespan, root_path=settings.root_path)
 
 if settings.cors_origins.strip() == "*":
     _origins = ["*"]

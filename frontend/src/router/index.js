@@ -14,8 +14,13 @@ import MidAirCard from '../components/MidAirCard.vue'
 
 // スタンドアロン（Live Server 等の静的サーバー）ではハッシュルーティング、
 // Vite dev / 通常ビルドでは履歴ルーティングを使う。
+// サブパス配信（例: /Midair.io/）では base を合わせる。
+const BASE_URL = !__STANDALONE__ && import.meta.env.BASE_URL ? import.meta.env.BASE_URL : '/'
+
 const router = createRouter({
-  history: __STANDALONE__ ? createWebHashHistory() : createWebHistory(),
+  history: __STANDALONE__
+    ? createWebHashHistory()
+    : createWebHistory(BASE_URL),
   routes: [
     { path: '/', component: HomeView },
     { path: '/stations', component: StationsView },

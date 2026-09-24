@@ -14,5 +14,10 @@ venv/
 node_modules/
 dist/
 
+# Local-only docs / deploy creds
+README.local.md
+*.pem
+*.key
+
 # OS
 .DS_Store
