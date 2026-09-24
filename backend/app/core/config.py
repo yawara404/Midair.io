@@ -37,9 +37,23 @@ class Settings(BaseSettings):
     # Discord チャット同期（Webhook URL）
     discord_webhook_url: Optional[str] = None
 
+    # LLM プロバイダ選択: auto | gemini | openai
+    # auto は openai_api_key があれば openai、無ければ gemini を使う。
+    llm_provider: str = "auto"
+
     # Google Gemini API（AIラジオDJ）
     gemini_api_key: Optional[str] = None
     gemini_model: str = "gemini-3.6-flash"
+
+    # OpenAI 互換 API（OpenRouter / Groq / OpenAI / ローカル Ollama など）
+    # base_url を変えるだけで各種サービスに対応（例:
+    #   OpenRouter: https://openrouter.ai/api/v1
+    #   Groq:       https://api.groq.com/openai/v1
+    #   Ollama:     http://localhost:11434/v1  (api_key は任意の文字列)
+    #   OpenAI:     https://api.openai.com/v1
+    openai_api_key: Optional[str] = None
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_model: str = "gpt-4o-mini"
 
     # YouTube Data API（任意。曲タイトル取得などに使用）
     # ※ 埋め込み再生（IFrame Player API）にはキーは不要。

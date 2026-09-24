@@ -1,7 +1,8 @@
 """AIラジオDJ / AIチャットbot（自由思考型）。
 
-LLM（Gemini API）で、キャラクター設定（ai_dj_prompt）と直前の会話を踏まえて
-その場で文章を生成する。定型文のリストは使わない。
+LLM（Gemini API / OpenAI互換 API）で、キャラクター設定（ai_dj_prompt）と
+直前の会話を踏まえてその場で文章を生成する。定型文のリストは使わない。
+プロバイダは LLM_PROVIDER（auto/gemini/openai）で切り替える。
 
 - チャットbot: リスナーの発言に、文脈を踏まえて自由に返信する。
 - アイドルDJ: 会話が途切れたときに、キャラクターとして自由に話しかける。
@@ -33,6 +34,26 @@ Discordのチャットbotのように、リスナーの発言へ自然に返信�
 返信（日本語で1〜2文。絵文字や顔文字を少し混ぜてOK）:"""
 
 
+def active_provider() -> Optional[str]:
+    """使用する LLM プロバイダを返す（auto はキーの有無で判定）。"""
+    p = (settings.llm_provider or "auto").strip().lower()
+    if p == "gemini":
+        return "gemini" if settings.gemini_api_key else None
+    if p == "openai":
+        return "openai" if settings.openai_api_key else None
+    # auto: OpenAI互換キーがあれば優先、無ければ Gemini
+    if settings.openai_api_key:
+        return "openai"
+    if settings.gemini_api_key:
+        return "gemini"
+    return None
+
+
+def is_llm_configured() -> bool:
+    """LLM（Gemini または OpenAI互換）が設定されているか。"""
+    return active_provider() is not None
+
+
 async def _call_gemini(prompt: str) -> str:
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -43,15 +64,41 @@ async def _call_gemini(prompt: str) -> str:
         resp = await client.post(url, json=payload, timeout=25)
         resp.raise_for_status()
         data = resp.json()
-        text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        return text
+        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+
+async def _call_openai(prompt: str) -> str:
+    """OpenAI 互換 API（/chat/completions）で生成する。"""
+    base = (settings.openai_base_url or "").rstrip("/")
+    headers = {"Content-Type": "application/json"}
+    if settings.openai_api_key:
+        headers["Authorization"] = f"Bearer {settings.openai_api_key}"
+    payload = {
+        "model": settings.openai_model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 1.0,
+    }
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{base}/chat/completions", json=payload, headers=headers, timeout=40
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data["choices"][0]["message"]["content"].strip()
+
+
+async def _call_llm(prompt: str) -> str:
+    """設定されたプロバイダで生成する。"""
+    if active_provider() == "openai":
+        return await _call_openai(prompt)
+    return await _call_gemini(prompt)
 
 
 async def generate_dj_line(
     program: str, context: str = "", persona: Optional[str] = None
 ) -> Optional[str]:
     """アイドルDJのひとことをLLMで自由生成する。失敗時は None。"""
-    if not settings.gemini_api_key:
+    if not is_llm_configured():
         return None
     prompt = _DJ_PROMPT.format(
         program=program or "Midair.io",
@@ -59,7 +106,7 @@ async def generate_dj_line(
         context=context or "（まだ誰もいない）",
     )
     try:
-        return await _call_gemini(prompt)
+        return await _call_llm(prompt)
     except Exception:
         return None
 
@@ -68,7 +115,7 @@ async def generate_chat_reply(
     program: str, persona: Optional[str], message: str, context: str = ""
 ) -> Optional[str]:
     """リスナーの発言への返信をLLMで自由生成する。失敗時は None。"""
-    if not settings.gemini_api_key:
+    if not is_llm_configured():
         return None
     prompt = _CHAT_PROMPT.format(
         program=program or "Midair.io",
@@ -77,7 +124,7 @@ async def generate_chat_reply(
         context=context or "（なし）",
     )
     try:
-        return await _call_gemini(prompt)
+        return await _call_llm(prompt)
     except Exception:
         return None
 
