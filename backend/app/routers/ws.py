@@ -174,7 +174,8 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
                     settings.discord_webhook_url, content, f"[{station_name}] {handle}"
                 )
                 # Miaちゃん局は Discord へ転送（双方向連携）
-                if station_name == settings.discord_station_callsign:
+                is_relay_station = station_name == settings.discord_station_callsign
+                if is_relay_station:
                     try:
                         from app.services import discord_bot
 
@@ -182,44 +183,54 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
                             await discord_bot.send_message(f"{handle}: {content}")
                     except Exception:
                         pass
-                else:
-                    # それ以外のAI局は Gemini で自由思考の返信（文脈つき）
-                    try:
-                        from app.services.ai_dj import maybe_chat_reply
 
-                        context = ""
-                        async with async_session_factory() as cs:
-                            rows = (
-                                await cs.execute(
-                                    select(Message)
-                                    .where(Message.station_id == station_id)
-                                    .order_by(Message.id.desc())
-                                    .limit(6)
-                                )
-                            ).scalars().all()
-                            context = "\n".join(
-                                f"{m.sender_name}: {m.content}" for m in reversed(rows)
+                # LLMで自由思考の返信（Mia局は「Mia」、その他のAI局は「DJ」として）
+                try:
+                    from app.services.ai_dj import maybe_chat_reply
+
+                    context = ""
+                    async with async_session_factory() as cs:
+                        rows = (
+                            await cs.execute(
+                                select(Message)
+                                .where(Message.station_id == station_id)
+                                .order_by(Message.id.desc())
+                                .limit(6)
                             )
-                        reply = await maybe_chat_reply(
-                            station_id,
-                            station_name,
-                            ai_dj_prompt,
-                            ai_dj_enabled,
-                            content,
-                            context=context,
+                        ).scalars().all()
+                        context = "\n".join(
+                            f"{m.sender_name}: {m.content}" for m in reversed(rows)
                         )
-                        if reply:
-                            bot_payload = await _persist_message(
-                                station_id, "DJ", reply, is_dj=True
-                            )
-                            await manager.broadcast(
-                                station_id, {"type": "message", **bot_payload}
-                            )
-                            await send_to_discord(
-                                settings.discord_webhook_url, reply, f"[{station_name}] DJ"
-                            )
-                    except Exception:
-                        pass
+                    reply = await maybe_chat_reply(
+                        station_id,
+                        station_name,
+                        ai_dj_prompt,
+                        ai_dj_enabled,
+                        content,
+                        context=context,
+                    )
+                    if reply:
+                        sender = "Mia" if is_relay_station else "DJ"
+                        bot_payload = await _persist_message(
+                            station_id, sender, reply, is_dj=True
+                        )
+                        await manager.broadcast(
+                            station_id, {"type": "message", **bot_payload}
+                        )
+                        await send_to_discord(
+                            settings.discord_webhook_url, reply, f"[{station_name}] {sender}"
+                        )
+                        # Mia局は返信も Discord へミラーする（双方向）
+                        if is_relay_station:
+                            try:
+                                from app.services import discord_bot
+
+                                if discord_bot.is_configured():
+                                    await discord_bot.send_message(f"Mia: {reply}")
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
 
             elif msg_type == "youtube_request":
                 raw = data.get("url") or data.get("video_id") or ""
