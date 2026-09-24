@@ -16,8 +16,8 @@
 - **リアルタイム匿名チャット** — WebSocket による低遅延メッセージ送受信。未ログインは「名無しのリスナー」として参加。
 - **YouTube BGM 同期再生** — ステーションごとの楽曲をリスナー全員で同時再生（音ありが既定、自動再生不可時はワンタップで再生）。
 - **再生ログ** — ステーション画面の NOW PLAYING 欄に、その局で流れた曲の履歴を表示。
-- **AI ラジオ DJ Bot** — 会話が途切れた際や「DJを呼ぶ」に応じて自動応答（LLMで自由生成。Gemini / OpenAI互換 API に対応。未設定時は何も投稿しない）。
-- **AIチャットbot常駐局「Miaちゃん」** — オタク天使のAIチャットbotが常駐するプリセット局（既定 88.0MHz）。**Discordと双方向連携**：MidairのチャットをDiscordのチャンネルへ転送し、Discord側の投稿を Mia としてMidairに投稿します。
+- **AI ラジオ DJ Bot** — 会話が途切れた際や「DJを呼ぶ」に応じて自動応答。リスナーへの返信も「DJ」として **LLM が自由生成**（定型文なし）。**Gemini / OpenAI互換 API**（OpenAI・OpenRouter・Groq・**ローカル Ollama** など）に対応。未設定時は何も投稿しません。
+- **AIチャットbot常駐局「Miaちゃん」** — オタク天使のAIチャットbotが常駐するプリセット局（既定 88.0MHz）。リスナーを「**フォロワーちゃん**」と呼び、LLM が自由に返信。**Discord と双方向連携**：Midair→Discordへ転送し、Discordの投稿はMidairへ取り込み＋MiaがDiscord上でも返信します。
 
 ### 番組表・掲示板アーカイブ
 
@@ -86,7 +86,13 @@
 - FastAPI + SQLAlchemy（async）による REST API と WebSocket（局チャット `/ws/{id}`・ロビー `/ws`）。
 - JWT + bcrypt による認証。ロール（`listener` / `broadcaster` / `dedicated_owner` / `admin`）で権限分離。
 - 周波数ライフサイクル、番組の自動 ON AIR/OFF AIR、放送セッションの自動記録をバックグラウンドで処理。
-- AI DJ（Gemini / OpenAI互換 API）、自動DJ局（人気曲/検索からランダム選曲）、専用局の自律運行（APScheduler）。
+- AI DJ / AIチャットbot（LLMで自由生成。Gemini / OpenAI互換 API、**ローカル Ollama 対応**）、Discord 双方向連携、自動DJ局（人気曲/検索からランダム選曲）、専用局の自律運行（APScheduler）。
+
+### AI / LLM
+
+- AI DJ・AIチャットbot（Miaちゃん）は LLM で**自由生成**（定型文のリストは使わない）。プロバイダは `LLM_PROVIDER`（`auto` / `gemini` / `openai`）で切替。
+- **OpenAI 互換 API** に対応。OpenAI / OpenRouter / Groq / **ローカル Ollama**（例: `gemma3:12b`）などを `OPENAI_BASE_URL` の変更だけで利用できます。
+- Miaちゃん局（88.0MHz）は **Discord Bot（discord.py Gateway）** と双方向連携。Midair・Discord の両方で Mia が返信し、会話は相互にミラーされます。
 
 ### データモデル（主なテーブル）
 
