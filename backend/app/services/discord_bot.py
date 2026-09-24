@@ -1,7 +1,8 @@
 """Discord 双方向連携（Miaちゃん）。
 
 - Midair の対象局（既定: Miaちゃん）の発言 → Discord の指定チャンネルへ転送
-- Discord の指定チャンネルの発言 → Midair の対象局へ「Mia」として投稿
+- Discord の指定チャンネルの発言 → Midair の対象局へ投稿し、さらに Mia として
+  LLM の返信を生成して Discord と Midair の両方へ投稿する。
 
 discord.py の Gateway（WebSocket）接続を使うため、常時接続のBotとして動作する。
 必要な設定（backend/.env）:
@@ -35,17 +36,12 @@ def is_configured() -> bool:
     )
 
 
-async def _relay_to_midair(text: str) -> None:
-    """Discord の発言を Midair の対象局へ投稿する。"""
-    text = (text or "").strip()
-    if not text:
-        return
+async def _get_station():
+    """連携対象の Midair 局を取得する。"""
     from sqlalchemy import select
 
     from app.core.database import async_session_factory
     from app.models.models import Station
-    from app.routers.ws import _persist_message
-    from app.services.websocket_manager import manager
 
     async with async_session_factory() as session:
         station = (
@@ -55,13 +51,56 @@ async def _relay_to_midair(text: str) -> None:
                 )
             )
         ).scalars().first()
-        if station is None:
-            return
-        station_id = station.id
+        return station
 
-    payload = await _persist_message(station_id, "Mia", text[:500], is_dj=True)
+
+async def _handle_discord_message(name: str, content: str) -> None:
+    """Discord の発言を Midair へ投稿し、Mia の返信を両方へ投稿する。"""
+    from sqlalchemy import select
+
+    from app.core.database import async_session_factory
+    from app.models.models import Message
+    from app.routers.ws import _persist_message
+    from app.services.websocket_manager import manager
+
+    station = await _get_station()
+    if station is None:
+        return
+    station_id = station.id
+    callsign = station.callsign
+    persona = station.ai_dj_prompt
+
+    # 1) Discord の発言を Midair へ（発言者名で）
+    payload = await _persist_message(station_id, name, content[:500])
     await manager.broadcast(station_id, {"type": "message", **payload})
     manager.touch(station_id)
+
+    # 2) Mia として LLM 返信を生成し、Discord と Midair の両方へ投稿
+    try:
+        from app.services.ai_dj import maybe_chat_reply
+
+        context = ""
+        async with async_session_factory() as cs:
+            rows = (
+                await cs.execute(
+                    select(Message)
+                    .where(Message.station_id == station_id)
+                    .order_by(Message.id.desc())
+                    .limit(6)
+                )
+            ).scalars().all()
+            context = "\n".join(
+                f"{m.sender_name}: {m.content}" for m in reversed(rows)
+            )
+        reply = await maybe_chat_reply(
+            station_id, callsign, persona, True, content, context=context
+        )
+        if reply:
+            await send_message(reply)
+            rp = await _persist_message(station_id, "Mia", reply, is_dj=True)
+            await manager.broadcast(station_id, {"type": "message", **rp})
+    except Exception as e:  # pragma: no cover
+        print("[discord] reply error:", e)
 
 
 def _build_client():
@@ -88,7 +127,7 @@ def _build_client():
             if not content:
                 return
             name = getattr(message.author, "display_name", None) or message.author.name
-            await _relay_to_midair(f"{name}: {content}")
+            await _handle_discord_message(name, content)
         except Exception as e:  # pragma: no cover
             print("[discord] relay error:", e)
 

@@ -10,12 +10,22 @@ LLM（Gemini API / OpenAI互換 API）で、キャラクター設定（ai_dj_pro
 Gemini API が未設定・失敗時は None を返し、呼び出し側は「何も投稿しない」。
 （＝定型文での代替はしない）
 """
+import re
 import time
 from typing import Optional
 
 import httpx
 
 from app.core.config import settings
+
+# 返信の先頭に付きがちな「Mia:」「DJ:」などのラベルを除去する
+_SELF_LABEL = re.compile(r"^\s*(Mia|ミア|DJ|AI)\s*[:：]\s*", re.IGNORECASE)
+
+
+def _clean(text: str) -> str:
+    text = (text or "").strip()
+    text = _SELF_LABEL.sub("", text)
+    return text.strip()
 
 _DJ_PROMPT = """あなたは配信「{program}」のDJです。以下のキャラクター設定になりきって、
 リスナーに今この瞬間のひとことを、自由に考えて話してください。定型文の暗唱はしないこと。
@@ -117,7 +127,7 @@ async def generate_dj_line(
         context=context or "（まだ誰もいない）",
     )
     try:
-        return await _call_llm(prompt)
+        return _clean(await _call_llm(prompt))
     except Exception:
         return None
 
@@ -135,7 +145,7 @@ async def generate_chat_reply(
         context=context or "（なし）",
     )
     try:
-        return await _call_llm(prompt)
+        return _clean(await _call_llm(prompt))
     except Exception:
         return None
 
