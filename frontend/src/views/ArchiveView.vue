@@ -37,13 +37,7 @@
           </span>
         </div>
 
-        <div class="replay__player">
-          <div id="archive-player" class="replay__frame"></div>
-          <div v-if="!currentTrack" class="replay__no-track">
-            この時間帯に音源はありません（チャットのみ）。
-          </div>
-        </div>
-
+        <!-- タイムシフト操作 -->
         <div class="replay__controls">
           <button class="btn btn--primary" @click="togglePlay">
             {{ playing ? '⏸ 一時停止' : '▶ タイムシフト再生' }}
@@ -59,20 +53,31 @@
           <span class="replay__time">{{ mmss(elapsed) }} / {{ mmss(duration) }}</span>
         </div>
 
-        <div ref="logEl" class="replay__log">
-          <div
-            v-for="m in visibleMessages"
-            :key="m.id"
-            class="msg"
-            :class="`msg--${m.message_type}`"
-          >
-            <span class="msg__author">{{ m.author }}</span>
-            <span class="msg__time">+{{ mmss(m.offset_seconds || 0) }}</span>
-            <p class="msg__content">{{ m.content }}</p>
+        <div class="replay__body">
+          <!-- チャットログ（メイン） -->
+          <div ref="logEl" class="replay__log">
+            <div
+              v-for="m in visibleMessages"
+              :key="m.id"
+              class="msg"
+              :class="`msg--${m.message_type}`"
+            >
+              <span class="msg__author">{{ m.author }}</span>
+              <span class="msg__time">+{{ mmss(m.offset_seconds || 0) }}</span>
+              <p class="msg__content">{{ m.content }}</p>
+            </div>
+            <p v-if="!visibleMessages.length" class="archive__empty">
+              再生ボタンを押すと、当時のログが流れてきます。
+            </p>
           </div>
-          <p v-if="!visibleMessages.length" class="archive__empty">
-            再生ボタンを押すと、当時のログが流れてきます。
-          </p>
+
+          <!-- 音源プレイヤー（小さく右上に配置） -->
+          <aside class="replay__player">
+            <div id="archive-player" class="replay__frame"></div>
+            <div v-if="!currentTrack" class="replay__no-track">
+              この時間帯に音源はありません（チャットのみ）。
+            </div>
+          </aside>
         </div>
       </section>
 
@@ -355,12 +360,17 @@ loadSessions()
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
+/* ログ（メイン）＋プレイヤー（小）の2カラム */
+.replay__body {
+  display: grid;
+  grid-template-columns: 1fr minmax(220px, 320px);
+  gap: 16px;
+  align-items: start;
+}
 .replay__player {
   position: relative;
-  /* 高さ上限 46vh を基準に 16:9 の幅を逆算（巨大化を防ぎログが見える） */
-  width: min(100%, calc(46vh * 16 / 9));
+  width: 100%;
   aspect-ratio: 16 / 9;
-  margin: 0 auto;
   background-color: #000;
   background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
   background-size: 16px 16px;
@@ -394,6 +404,7 @@ loadSessions()
 }
 .replay__seek {
   flex: 1;
+  min-width: 0;
   accent-color: var(--green);
 }
 .replay__time {
@@ -403,13 +414,15 @@ loadSessions()
   white-space: nowrap;
 }
 .replay__log {
-  max-height: 42vh;
+  /* チャットログを主役に：たっぷり表示してスクロール */
+  max-height: 64vh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--line-strong);
+  padding: 12px;
+  background: var(--panel-deep);
+  border: 1px solid var(--line-strong);
 }
 .msg {
   border-left: 2px solid var(--line-strong);
@@ -469,8 +482,12 @@ loadSessions()
     order: 3;
     flex-basis: 100%;
   }
+  /* モバイルは1カラム（ログ → プレイヤー） */
+  .replay__body {
+    grid-template-columns: 1fr;
+  }
   .replay__log {
-    max-height: 240px;
+    max-height: 50vh;
   }
 }
 </style>
