@@ -41,15 +41,18 @@ def _private_key() -> Optional[str]:
     return key.replace("\\n", "\n")
 
 
-def is_configured() -> bool:
+def _can_auth() -> bool:
+    """トークン取得に必要な設定が揃っているか（channel_id は不要）。"""
     return bool(
         settings.lineworks_enabled
         and settings.lineworks_client_id
         and settings.lineworks_service_account
         and (settings.lineworks_private_key or settings.lineworks_private_key_file)
-        and settings.lineworks_bot_id
-        and settings.lineworks_channel_id
     )
+
+
+def is_configured() -> bool:
+    return bool(_can_auth() and settings.lineworks_bot_id and settings.lineworks_channel_id)
 
 
 async def _get_token() -> Optional[str]:
@@ -57,7 +60,7 @@ async def _get_token() -> Optional[str]:
     now = time.time()
     if _token["value"] and now < _token["exp"] - 60:
         return _token["value"]
-    if not is_configured():
+    if not _can_auth():
         return None
 
     iat = int(now)
