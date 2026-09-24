@@ -25,15 +25,13 @@
           :class="{ 'is-active': current && current.id === t.id }"
           @click="openThread(t)"
         >
-          <span class="session-card__title">
-            第{{ t.number }}スレ <span v-if="t.is_archived" class="session-card__archived">過去ログ</span>
-          </span>
+          <span class="session-card__title">{{ t.title }}</span>
           <span class="session-card__meta">
-            {{ t.frequency != null ? t.frequency.toFixed(1) : '—' }}MHz {{ t.station_callsign || '—' }}
+            {{ t.frequency != null ? t.frequency.toFixed(1) : '—' }}MHz
+            ・ {{ t.post_count }} / {{ maxPosts }} 投稿
+            ・ {{ fmt(t.created_at) }}
           </span>
-          <span class="session-card__meta">
-            {{ fmt(t.created_at) }} ・ {{ t.post_count }} / {{ maxPosts }} 投稿
-          </span>
+          <span v-if="t.is_archived" class="session-card__archived">過去ログ</span>
         </button>
         <p v-if="!threads.length" class="archive__empty">まだスレッドがありません。</p>
       </aside>

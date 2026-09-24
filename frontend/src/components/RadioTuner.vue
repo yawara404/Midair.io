@@ -58,11 +58,8 @@
       <MarqueeText class="tuner__program-desc" :text="currentChannel ? currentChannel.description : ''" />
     </div>
 
-    <!-- 周波数ページ（マップ）へ移動 -->
-    <router-link
-      class="btn btn--ghost tuner__map"
-      :to="`/frequencies?freq=${Number(currentFrequency).toFixed(1)}`"
-    >
+    <!-- 周波数ページ（＝アーカイブ／過去スレッド一覧）へ -->
+    <router-link class="btn btn--ghost tuner__map" to="/archive">
       🗺 周波数ページへ
     </router-link>
 
@@ -336,6 +333,7 @@ function stopDrag() {
   width: 100%;
   text-align: center;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .tuner__program {
