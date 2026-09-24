@@ -101,7 +101,7 @@ async def _call_openai(prompt: str) -> str:
     }
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            f"{base}/chat/completions", json=payload, headers=headers, timeout=40
+            f"{base}/chat/completions", json=payload, headers=headers, timeout=120
         )
         resp.raise_for_status()
         data = resp.json()

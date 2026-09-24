@@ -166,13 +166,13 @@ async def stop() -> None:
     if _client is not None:
         try:
             await _client.close()
-        except Exception:
+        except (Exception, asyncio.CancelledError):
             pass
     if _task is not None:
         _task.cancel()
         try:
             await _task
-        except Exception:
+        except (Exception, asyncio.CancelledError):
             pass
     _client = None
     _task = None
