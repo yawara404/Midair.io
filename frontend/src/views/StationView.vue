@@ -470,10 +470,11 @@ onBeforeUnmount(() => {
     gap: 10px;
   }
   .station-view__stream {
-    /* ビューポート高さいっぱいのチャット（ヘッダー・トグル等を差し引く） */
-    height: calc(100dvh - 170px);
-    min-height: 460px;
-    max-height: 1000px;
+    /* ビューポート高さいっぱいのチャット（vh は古いブラウザ用フォールバック） */
+    height: calc(100vh - 118px);
+    height: calc(100dvh - 118px);
+    min-height: 500px;
+    max-height: 1200px;
   }
   .station-view__side {
     overflow: visible;
@@ -511,22 +512,23 @@ onBeforeUnmount(() => {
     gap: 8px;
   }
   .station-view__stream {
-    height: calc(100dvh - 156px);
-    min-height: 420px;
+    height: calc(100vh - 108px);
+    height: calc(100dvh - 108px);
+    min-height: 460px;
   }
   .now {
     flex-wrap: wrap;
     font-size: 12px;
     gap: 6px;
-    padding: 7px 10px;
-    margin-bottom: 6px;
+    padding: 6px 10px;
+    margin-bottom: 5px;
   }
   .now__freq {
     margin-left: auto;
   }
   .thread-bar {
-    padding: 6px 10px;
-    margin: 6px 0 8px;
+    padding: 5px 9px;
+    margin: 5px 0 6px;
     font-size: 11px;
     gap: 6px;
   }

@@ -114,7 +114,7 @@ function callDj() {
 @media (max-width: 640px) {
   .input {
     gap: 6px;
-    margin-top: 8px;
+    margin-top: 6px;
   }
   /* チャットは「入力欄＋送信」を1行に収めて縦を節約 */
   .input__chat .input__field {
