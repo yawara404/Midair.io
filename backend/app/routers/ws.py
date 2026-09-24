@@ -173,21 +173,13 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
                 await send_to_discord(
                     settings.discord_webhook_url, content, f"[{station_name}] {handle}"
                 )
-                # Miaちゃん局は外部チャット（Discord / LINE WORKS）へ転送（双方向連携）
-                if station_name in (
-                    settings.discord_station_callsign,
-                    settings.lineworks_station_callsign,
-                ):
+                # Miaちゃん局は Discord へ転送（双方向連携）
+                if station_name == settings.discord_station_callsign:
                     try:
-                        from app.services import discord_bot, lineworks
+                        from app.services import discord_bot
 
-                        relayed = False
                         if discord_bot.is_configured():
-                            relayed = await discord_bot.send_message(
-                                f"{handle}: {content}"
-                            )
-                        if not relayed and lineworks.is_configured():
-                            await lineworks.send_message(f"{handle}: {content}")
+                            await discord_bot.send_message(f"{handle}: {content}")
                     except Exception:
                         pass
                 else:

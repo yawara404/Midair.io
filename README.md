@@ -17,7 +17,7 @@
 - **YouTube BGM 同期再生** — ステーションごとの楽曲をリスナー全員で同時再生（音ありが既定、自動再生不可時はワンタップで再生）。
 - **再生ログ** — ステーション画面の NOW PLAYING 欄に、その局で流れた曲の履歴を表示。
 - **AI ラジオ DJ Bot** — 会話が途切れた際や「DJを呼ぶ」に応じて自動応答（Gemini API。未設定時はルールベース）。
-- **AIチャットbot常駐局「Miaちゃん」** — オタク天使のAIチャットbotが常駐するプリセット局（既定 88.0MHz）。**LINE WORKS のBot APIと双方向連携**：MidairのチャットをLINE WORKSのチャンネルへ転送し、LINE WORKS側の返信を Mia としてMidairに投稿します。
+- **AIチャットbot常駐局「Miaちゃん」** — オタク天使のAIチャットbotが常駐するプリセット局（既定 88.0MHz）。**Discordと双方向連携**：MidairのチャットをDiscordのチャンネルへ転送し、Discord側の投稿を Mia としてMidairに投稿します。
 
 ### 番組表・掲示板アーカイブ
 

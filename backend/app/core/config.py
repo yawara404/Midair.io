@@ -52,21 +52,6 @@ class Settings(BaseSettings):
     # AIチャットbot（リスナーの発言に返信）のクールダウン秒数
     bot_reply_cooldown_seconds: int = 12
 
-    # --- LINE WORKS 連携（Miaちゃんのチャットbot） ---
-    # 双方向: Midair → LINE WORKS チャンネルへ転送 / LINE WORKS → Midair に投稿
-    lineworks_enabled: bool = False
-    lineworks_client_id: Optional[str] = None
-    lineworks_client_secret: Optional[str] = None
-    lineworks_service_account: Optional[str] = None
-    # PEM秘密鍵（改行はそのまま、または \n エスケープ可）
-    lineworks_private_key: Optional[str] = None
-    # 秘密鍵をファイルで指定する場合（.pem/.key のパス）。上の値より優先はしません。
-    lineworks_private_key_file: Optional[str] = None
-    lineworks_bot_id: Optional[str] = None
-    lineworks_channel_id: Optional[str] = None
-    # 連携する Midair の局（コールサイン）
-    lineworks_station_callsign: str = "Miaちゃん"
-
     # --- Discord 連携（Miaちゃんのチャットbot・双方向 / discord.py Gateway） ---
     # Midair → Discord チャンネルへ転送 / Discord チャンネル → Midair に投稿
     discord_bot_enabled: bool = False
