@@ -19,5 +19,11 @@ README.local.md
 *.pem
 *.key
 
+# Local-only secrets (never commit)
+admin_password.txt
+
+# Runtime logs / pid files
+logs/
+
 # OS
 .DS_Store
