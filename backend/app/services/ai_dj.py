@@ -100,8 +100,9 @@ async def _call_openai(prompt: str) -> str:
         "frequency_penalty": 0.3,
     }
     async with httpx.AsyncClient() as client:
+        # アイドル後にモデルを再ロードする場合があるため長め（16GB機・12Bで最大2分程度）
         resp = await client.post(
-            f"{base}/chat/completions", json=payload, headers=headers, timeout=120
+            f"{base}/chat/completions", json=payload, headers=headers, timeout=180
         )
         resp.raise_for_status()
         data = resp.json()
