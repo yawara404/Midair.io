@@ -287,7 +287,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* ===== フッター ===== */
+/* ===== フッター（ホーム下部。全文字を白で統一） ===== */
 .site-footer {
   margin-top: 22px;
   padding: 14px 16px 18px;
@@ -311,21 +311,19 @@ onBeforeUnmount(() => {
   font-family: inherit;
   font-size: 12px;
   letter-spacing: 0.02em;
-  color: var(--text-dim);
+  color: var(--green);
   cursor: pointer;
   border-bottom: 1px dashed var(--line-strong);
 }
 .site-footer__link:hover {
   color: var(--green);
   border-bottom-color: var(--green);
+  border-bottom-style: solid;
 }
 .site-footer__copy {
   margin: 0;
   font-size: 11px;
   letter-spacing: 1px;
-  color: var(--faint);
-}
-.site-footer__copy span {
   color: var(--green);
 }
 
@@ -369,7 +367,7 @@ onBeforeUnmount(() => {
 .info-modal__close {
   background: none;
   border: none;
-  color: var(--text-dim);
+  color: var(--green);
   font-size: 14px;
   cursor: pointer;
   padding: 2px 6px;
@@ -388,7 +386,7 @@ onBeforeUnmount(() => {
 .info-modal__updated {
   margin: 0 0 12px;
   font-size: 11px;
-  color: var(--faint);
+  color: var(--green);
 }
 .info-modal__sec {
   margin-bottom: 16px;
@@ -412,7 +410,7 @@ onBeforeUnmount(() => {
 .info-modal__p {
   font-size: 12px;
   line-height: 1.75;
-  color: var(--text-dim);
+  color: var(--green);
 }
 .info-modal__p {
   margin: 0;
@@ -425,7 +423,7 @@ onBeforeUnmount(() => {
 .info-modal__link {
   font-size: 12px;
   line-height: 1.7;
-  color: var(--text);
+  color: var(--green);
   text-decoration: none;
   border-bottom: 1px dashed var(--line-strong);
   padding: 2px 0;
