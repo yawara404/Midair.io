@@ -297,6 +297,9 @@ async def _dj_loop() -> None:
                 if station is None or not station.ai_dj_enabled:
                     manager.touch(station_id)
                     continue
+                # 停波中（砂嵐）の局には話しかけない
+                if station.status != "live":
+                    continue
                 # 外部連携局（Miaちゃん）は idle DJ を行わない
                 if station.callsign == settings.discord_station_callsign:
                     manager.touch(station_id)

@@ -491,6 +491,8 @@ def _filter_items(items: list[dict], theme: Optional[dict] = None) -> list[dict]
                     item.get("contentDetails", {}).get("duration")
                 ),
                 "synth_level": synth_level,
+                # 公開日時（新曲・急上昇を優先するために使う）
+                "published_at": snippet.get("publishedAt"),
             }
         )
     return out
@@ -596,9 +598,11 @@ def _cache_key(source: str, query: Optional[str]) -> str:
 def _next_vocaloid_themes(count: int) -> list[dict]:
     """ファミリーをまたいで次のテーマを選ぶ。
 
-    毎回ちがう組み合わせ（歌声・ジャンル・年代・プロデューサー）になるよう、
+    毎回ちがう組み合わせ（歌声・ジャンル・年代・プロデューサー・急上昇）になるよう、
     ファミリーごとの巡回位置を1つずつ進めながら選ぶ。テーマ数がファミリー数を
     超えるときは、同じファミリー内の別テーマを続けて選ぶ。
+    急上昇（新曲）も他のファミリーと同じ頻度で巡回する（選曲では公開日の浅さで
+    少しだけ後押しする。dj_bot_vocaloid_fresh_bias）。
     """
     families = list(_VOCALOID_BY_FAMILY)
     random.shuffle(families)
@@ -666,14 +670,15 @@ def _merge_vocaloid_pool(old: list[dict], new: list[dict]) -> list[dict]:
             # API不通時の代替曲は、実際の候補が取れたら混ぜない
             continue
         video_id = item["youtube_id"]
-        if video_id in merged:
-            merged[video_id] = item
-            continue
+        is_new = video_id not in merged
         channel = (item.get("channel") or "").strip()
-        if channel:
+        if is_new and channel:
             if per_channel.get(channel, 0) >= _MAX_POOL_PER_CHANNEL:
                 continue
             per_channel[channel] = per_channel.get(channel, 0) + 1
+        # 既存の曲も末尾へ移して「最新の情報」として残す
+        # （新しく取れた急上昇の候補が末尾の切り捨てで消えないようにする）
+        merged.pop(video_id, None)
         merged[video_id] = item
     return list(merged.values())[-cap:]
 
@@ -709,13 +714,29 @@ async def pool(source: str = "trending", query: Optional[str] = None) -> list[di
     return items
 
 
+def _age_days(item: dict) -> Optional[float]:
+    """公開からの経過日数（公開日時が無い・不正なら None）。"""
+    raw = item.get("published_at")
+    if not raw:
+        return None
+    try:
+        published = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if published.tzinfo is None:
+        published = published.replace(tzinfo=timezone.utc)
+    return max(0.0, (datetime.now(timezone.utc) - published).total_seconds() / 86400)
+
+
 def _popularity_weight(item: dict, source: str = "trending") -> float:
     """選曲の重み。再生数が多い曲ほど選ばれやすくする（人気曲優先）。
 
     dj_bot_popularity_power で強さを変える（0=等倍＝完全ランダム、
     0.5=控えめに人気曲を優先、1.0=再生数に比例）。
     Vocaloid BOT では合成音声歌唱優先のため、タイトルに歌声合成のクレジットが
-    ある曲（synth_level=2）の重みを dj_bot_vocaloid_synth_bias 倍する。
+    ある曲（synth_level=2）の重みを dj_bot_vocaloid_synth_bias 倍し、さらに
+    「最新の急上昇」を優先するため、公開から日が浅い曲の重みを
+    dj_bot_vocaloid_fresh_bias で引き上げる。
     """
     power = max(0.0, min(float(settings.dj_bot_popularity_power), 2.0))
     views = item.get("views") or 0
@@ -724,8 +745,19 @@ def _popularity_weight(item: dict, source: str = "trending") -> float:
         weight = 1.0
     else:
         weight = float(views) ** power
-    if source == "vocaloid" and item.get("synth_level") == 2:
-        weight *= 1.0 + max(0.0, float(settings.dj_bot_vocaloid_synth_bias))
+    if source == "vocaloid":
+        if item.get("synth_level") == 2:
+            weight *= 1.0 + max(0.0, float(settings.dj_bot_vocaloid_synth_bias))
+        # 最新の急上昇を優先: 公開から fresh_days 以内は (1+bias) 倍、
+        # その3倍の日数以内は半分のプラス
+        fresh_days = max(0, int(settings.dj_bot_vocaloid_fresh_days))
+        fresh_bias = max(0.0, float(settings.dj_bot_vocaloid_fresh_bias))
+        age = _age_days(item)
+        if age is not None and fresh_days > 0 and fresh_bias > 0:
+            if age <= fresh_days:
+                weight *= 1.0 + fresh_bias
+            elif age <= fresh_days * 3:
+                weight *= 1.0 + fresh_bias / 2
     return weight
 
 

@@ -264,31 +264,47 @@ function callDj(text) {
   }
 }
 
-// 自動DJ局で曲が最後まで再生されたら次曲へ
+// 曲が最後まで再生されたときの報告
+//  - 自動DJ局: 次曲へ（バックエンドが選曲）
+//  - 通常局/専用局: 曲終了を報告（通常局は砂嵐にするため。専用局はエンジンが次曲を送出）
 async function onPlayerEnded({ videoId } = {}) {
   const s = currentStation.value
-  if (!s || !s.is_bot || !videoId) return
+  if (!s || !videoId) return
   try {
-    await api(`/stations/${s.id}/bot/ended`, {
-      method: 'POST',
-      body: JSON.stringify({ video_id: videoId }),
-    })
+    if (s.is_bot) {
+      await api(`/stations/${s.id}/bot/ended`, {
+        method: 'POST',
+        body: JSON.stringify({ video_id: videoId }),
+      })
+    } else {
+      await api(`/stations/${s.id}/track-ended`, {
+        method: 'POST',
+        body: JSON.stringify({ video_id: videoId, reason: 'ended' }),
+      })
+    }
   } catch (e) {
-    /* 次曲はバックエンドのループが処理する */
+    /* 自動DJ局はバックエンドのループが次曲を処理する */
   }
 }
 
-// 自動DJ局で埋め込み再生に失敗した曲を報告し、次曲へ切り替えてもらう
+// 埋め込み再生できなかった曲の報告（自動DJ局は次曲へ、通常局は砂嵐にする）
 async function onPlayerError({ videoId } = {}) {
   const s = currentStation.value
-  if (!s || !s.is_bot || !videoId) return
+  if (!s || !videoId) return
   try {
-    await api(`/stations/${s.id}/bot/report`, {
-      method: 'POST',
-      body: JSON.stringify({ video_id: videoId }),
-    })
+    if (s.is_bot) {
+      await api(`/stations/${s.id}/bot/report`, {
+        method: 'POST',
+        body: JSON.stringify({ video_id: videoId }),
+      })
+    } else {
+      await api(`/stations/${s.id}/track-ended`, {
+        method: 'POST',
+        body: JSON.stringify({ video_id: videoId, reason: 'error' }),
+      })
+    }
   } catch (e) {
-    /* 次曲はバックエンドのループが処理する */
+    /* 失敗時は何もしない（次曲はバックエンド/パーソナリティが処理する） */
   }
 }
 

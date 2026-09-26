@@ -20,6 +20,7 @@ from app.models.models import (
     BotStation,
     BroadcastSession,
     Message,
+    Program,
     Reservation,
     SessionTrack,
     Station,
@@ -27,8 +28,9 @@ from app.models.models import (
     User,
 )
 from app.routers.frequencies import broadcast_frequency_status
+from app.services.bot_dj import play_next
 from app.services.dj_announce import schedule_track_change
-from app.services.sessions import open_session, record_track
+from app.services.sessions import close_session, open_session, record_track
 from app.services.websocket_manager import manager
 
 router = APIRouter(prefix="/api", tags=["stations"])
@@ -422,6 +424,96 @@ async def remove_favorite(
         await db.delete(existing)
         await db.commit()
     return {"success": True, "favorited": False}
+
+
+class BotReportIn2(BaseModel):
+    """どの局でも使える「曲が終わった/再生できなかった」報告。"""
+
+    video_id: Optional[str] = None
+    # ended = 最後まで再生 / error = 埋め込み再生できなかった
+    reason: Optional[str] = None
+
+
+@router.post("/stations/{station_id}/track-ended")
+async def track_ended(
+    station_id: int,
+    data: BotReportIn2,
+    db: AsyncSession = Depends(get_db),
+):
+    """再生中の曲が終わった（または再生できなかった）ことをリスナーから受け取る。
+
+    - 自動DJ局（DJ BOT / Vocaloid BOT）: 次の曲へ（`/bot/ended` と同じ）
+    - 専用局（24時間常設）: 何もしない（自律運行エンジンが次曲を送出する）
+    - 番組枠の放送中: 曲だけクリアして `live` を維持（番組終了時刻はタイムテーブルに任せる）
+    - それ以外の通常局: 曲が尽きたら**停波（砂嵐）**にする
+
+    通常局は次曲を自動で選ばないため、そのままだと最後の曲が何度も再生され
+    砂嵐にならない（＝放送が終わらない）状態になる。ここで曲をクリアして
+    停波することで、次のリクエスト/BGM設定まで砂嵐になる。
+    """
+    station = await db.get(Station, station_id)
+    if station is None:
+        raise HTTPException(status_code=404, detail="ステーションが見つかりません")
+    # 報告された曲が「今オンエア中の曲」と一致するときだけ処理する（古い報告は無視）
+    if not data.video_id or station.current_youtube_id != data.video_id:
+        return {"success": True, "action": "ignored"}
+
+    # 自動DJ局は次の曲へ
+    if await db.get(BotStation, station_id) is not None:
+        await play_next(db, station)
+        return {"success": True, "action": "next"}
+
+    # 専用局は自律運行エンジンに任せる
+    if station.is_dedicated:
+        return {"success": True, "action": "dedicated"}
+
+    # 番組枠（タイムテーブル）で放送中か
+    now = datetime.now()
+    active_program = (
+        await db.execute(
+            select(Program.id)
+            .where(
+                Program.station_id == station_id,
+                Program.start_time <= now,
+                Program.end_time > now,
+            )
+            .limit(1)
+        )
+    ).scalars().first()
+
+    # 曲をクリア（遅れて来たリスナーに同じ曲を再生させない）
+    station.current_youtube_id = None
+    station.playback_started_at = None
+    if active_program is not None:
+        # 番組枠の間は停波しない（曲だけクリアして放送は維持する）
+        await db.commit()
+        await manager.broadcast(
+            station_id,
+            {"type": "track_update", "youtube_video_id": None, "playback_started_at": None},
+        )
+        return {"success": True, "action": "cleared"}
+
+    # 通常局は停波（砂嵐）して放送セッションを閉じる
+    station.set_status("off_air")
+    await db.commit()
+    await close_session(db, station_id)
+    await broadcast_frequency_status(station.frequency, "off_air", station.id)
+    await manager.broadcast(
+        station_id, {"type": "live_update", "is_live": False, "status": "off_air"}
+    )
+    await manager.broadcast(
+        station_id,
+        {"type": "track_update", "youtube_video_id": None, "playback_started_at": None},
+    )
+    await manager.broadcast(
+        station_id,
+        {
+            "type": "system",
+            "content": "📻 曲が終了しました。次の曲が設定されるまで砂嵐（OFF AIR）になります。",
+            "listener_count": manager.channel_count(station_id),
+        },
+    )
+    return {"success": True, "action": "off_air"}
 
 
 # ---- エコシステム用プレビュー ----

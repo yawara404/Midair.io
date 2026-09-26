@@ -130,6 +130,12 @@ class Settings(BaseSettings):
     # どれだけ優先するか。選曲の重みに (1 + この値) を掛ける
     # （0=優先しない / 1.0=2倍 / 3.0=4倍。人気曲の重みに上乗せされる）
     dj_bot_vocaloid_synth_bias: float = 1.0
+    # 新曲（最近公開された曲）をどれだけ優先するか。
+    # dj_bot_vocaloid_fresh_days 以内に公開された曲の重みを (1 + この値) 倍する
+    # （0=優先しない / 0.6=1.6倍。控えめに後押しする程度にしておく）
+    dj_bot_vocaloid_fresh_bias: float = 0.6
+    # 「新曲」とみなす日数（この日数以内は上の倍率、3倍の日数以内は半分の倍率）
+    dj_bot_vocaloid_fresh_days: int = 30
 
     # 専用局（24時間常設）の自律運行エンジン
     dedicated_engine_enabled: bool = True
