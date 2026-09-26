@@ -21,7 +21,7 @@
 - `/stations` 開局
 - `/archive` 過去ログ（アーカイブ）
 - `/frequencies` 周波数マップ
-- `/station/{id}` 各局の掲示板（例: `/station/8` は Miaちゃん局 88.0MHz）
+- `/station/{id}` 各局の掲示板。**IDは周波数の小さい順**（例: `/station/1`=80.0MHz 開局周波数、`/station/3`=84.0MHz DJ BOT、`/station/8`=89.0MHz 管理者セレクト）
 
 ## ポリシー / サイト情報（ハッシュ付きURLで直リンク可）
 ホーム下部のフッターから、以下の内容をモーダルで表示します（URLのハッシュが変わり、閉じると戻ります）。
