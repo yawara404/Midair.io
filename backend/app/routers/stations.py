@@ -7,7 +7,12 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
+from app.core.bands import (
+    bands_payload,
+    dedicated_frequencies,
+    free_frequencies,
+    validate_free_frequency,
+)
 from app.core.database import get_db
 from app.core.security import require_user
 from app.core.utils import parse_youtube_id
@@ -22,6 +27,7 @@ from app.models.models import (
     User,
 )
 from app.routers.frequencies import broadcast_frequency_status
+from app.services.dj_announce import schedule_track_change
 from app.services.sessions import open_session, record_track
 from app.services.websocket_manager import manager
 
@@ -68,23 +74,27 @@ async def list_stations(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/stations/available")
-async def available_frequencies(db: AsyncSession = Depends(get_db)):
-    """開局可能な空き周波数の一覧を返す。"""
+async def available_frequencies(
+    band: str = "free", db: AsyncSession = Depends(get_db)
+):
+    """開局可能な空き周波数の一覧を返す。
+
+    - band=free（既定）: 自由な周波数（誰でも開局・予約できる一般帯）
+    - band=dedicated:    専用局（24時間常設）を作成できる帯
+    """
     result = await db.execute(select(Station.frequency))
     used = {round(float(f), 1) for f in result.scalars().all()}
-    available = []
-    freq = settings.station_freq_min
-    while freq <= settings.station_freq_max + 1e-9:
-        r = round(freq, 1)
-        if r not in used:
-            available.append(r)
-        freq += 0.1
+    key = "dedicated" if band == "dedicated" else "free"
+    wanted = dedicated_frequencies() if key == "dedicated" else free_frequencies()
+    info = bands_payload()
+    band_info = next((b for b in info["bands"] if b["key"] == key), None)
+    available = [f for f in wanted if f not in used]
     return {
         "success": True,
-        "min": settings.station_freq_min,
-        "max": settings.station_freq_max,
-        "available": available,
+        "band": band_info,
+        "bands": info["bands"],
         "count": len(available),
+        "available": available,
     }
 
 
@@ -158,13 +168,9 @@ async def list_station_tracks(
 
 
 async def _launch_station(data: StationCreate, user: User, db: AsyncSession) -> Station:
-    """開局の共通処理（保有制約・排他チェック）。"""
-    freq = round(data.frequency, 1)
-    if freq < settings.station_freq_min or freq > settings.station_freq_max:
-        raise HTTPException(
-            status_code=400,
-            detail=f"周波数は{settings.station_freq_min:.1f}〜{settings.station_freq_max:.1f}MHzの範囲で指定してください",
-        )
+    """開局の共通処理（帯域・保有制約・排他チェック）。"""
+    # 一般開局は「自由な周波数」（専用局帯以外）のみ
+    freq = validate_free_frequency(data.frequency)
     if not data.callsign.strip():
         raise HTTPException(status_code=400, detail="コールサイン（局名）を入力してください")
 
@@ -304,6 +310,8 @@ async def station_set_youtube(
             "track": track.to_dict() if track else None,
         },
     )
+    # 曲が切り替わったらDJが曲紹介コメントを投稿する（今流れている曲に連動）
+    schedule_track_change(station_id, video_id, track.title if track else None)
     return {"success": True, "station": _with_listeners(station)}
 
 

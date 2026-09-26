@@ -10,7 +10,17 @@
         <div class="daf__grid">
           <label class="daf__field">
             <span>希望周波数（MHz）</span>
-            <input v-model="form.desired_frequency" type="number" min="76" max="88.9" step="0.1" placeholder="例: 87.3" />
+            <input
+              v-model="form.desired_frequency"
+              type="number"
+              :min="freqMin"
+              :max="freqMax"
+              step="0.1"
+              :placeholder="`例: ${exampleFreq}`"
+            />
+            <small class="daf__hint">
+              専用局を申請できるのは専用局帯（{{ freqMin.toFixed(1) }}〜{{ freqMax.toFixed(1) }}MHz）のみです。
+            </small>
           </label>
           <label class="daf__field">
             <span>コールサイン（局名）</span>
@@ -67,11 +77,18 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { api } from '../api'
 import { useAuthStore } from '../stores/auth'
 
 const emit = defineEmits(['need-login'])
+
+// 帯域（専用局帯）の範囲: 親から渡される（未指定ならサーバー既定の 76.0〜79.9）
+const props = defineProps({
+  band: { type: Object, default: null },
+  // 周波数マップで「専用局を申請」したときに自動入力する周波数
+  prefillFrequency: { type: [Number, String], default: null },
+})
 
 const auth = useAuthStore()
 const genres = ref(['general'])
@@ -79,6 +96,10 @@ const mine = ref([])
 const error = ref('')
 const ok = ref('')
 const busy = ref(false)
+
+const freqMin = computed(() => Number(props.band?.min ?? 76.0))
+const freqMax = computed(() => Number(props.band?.max ?? 79.9))
+const exampleFreq = computed(() => ((freqMin.value + freqMax.value) / 2).toFixed(1))
 
 const form = reactive({
   desired_frequency: '',
@@ -89,6 +110,17 @@ const form = reactive({
   ai_dj_concept: '',
   tracksText: '',
 })
+
+// 周波数マップで「専用局を申請」した周波数を自動入力する
+watch(
+  () => props.prefillFrequency,
+  (f) => {
+    if (f === null || f === undefined || f === '') return
+    form.desired_frequency = Number(f)
+    error.value = ''
+    ok.value = ''
+  }
+)
 
 function statusLabel(s) {
   return { pending: '審査待ち', approved: '承認済み', rejected: '却下' }[s] || s
@@ -211,6 +243,11 @@ defineExpose({ loadMine })
 .daf__field textarea:focus,
 .daf__field select:focus {
   border-color: var(--green);
+}
+.daf__hint {
+  font-size: 11px;
+  color: var(--faint);
+  line-height: 1.6;
 }
 .daf__err {
   color: var(--green);

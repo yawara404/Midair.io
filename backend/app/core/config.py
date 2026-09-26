@@ -63,9 +63,24 @@ class Settings(BaseSettings):
     # ※ 埋め込み再生（IFrame Player API）にはキーは不要。
     youtube_api_key: Optional[str] = None
 
-    # AI DJ の動作設定
+    # DJ の動作設定
     dj_enabled: bool = True
     dj_idle_seconds: int = 120
+    # DJは「DJさん」「hey DJ」と呼びかけられたときだけ返事する
+    # （Discord連携局のMiaちゃんはチャットbotなので常時返事する。
+    #   False にすると従来どおり全てのチャットに返事する）
+    dj_reply_requires_call: bool = True
+
+    # --- 今オンエア中の曲に連動したDJコメント ---
+    # アイドルDJ・「DJを呼ぶ」・チャット返信のコメントに、今流れている曲名を渡して
+    # 曲の話題（印象・歌詞・聴きどころ）に触れさせる。
+    dj_track_comment_enabled: bool = True
+    # 曲が切り替わった瞬間にDJが曲紹介コメントを投稿する
+    dj_track_intro_enabled: bool = True
+    # 同じ局で曲紹介を連投しないための最小間隔（秒）
+    dj_track_intro_cooldown_seconds: int = 10
+    # 誰も聴いていない局では曲紹介をしない（LLM呼び出しの節約）
+    dj_track_intro_requires_listener: bool = True
 
     # AIチャットbot（リスナーの発言に返信）のクールダウン秒数
     bot_reply_cooldown_seconds: int = 12
@@ -104,6 +119,15 @@ class Settings(BaseSettings):
     dj_bot_vocaloid_cache_minutes: int = 90
     # 蓄積する候補プールの上限（この中から直近の曲と重複しない曲をランダムに選ぶ）
     dj_bot_vocaloid_pool_size: int = 400
+    # 合成音声歌唱優先: 歌声合成（ボカロ等）のクレジットが確認できる曲だけを流す。
+    #   True  = タイトル/タグ/説明欄/投稿者名のどこかにクレジットが必要
+    #           （人が歌っている曲・インストを流さない）
+    #   False = 投稿者（ボカロP・公式チャンネル）だけで判断する従来動作
+    dj_bot_vocaloid_synth_only: bool = True
+    # タイトルに歌声合成のクレジットがある曲（＝合成音声の歌唱とほぼ確実）を
+    # どれだけ優先するか。選曲の重みに (1 + この値) を掛ける
+    # （0=優先しない / 1.0=2倍 / 3.0=4倍。人気曲の重みに上乗せされる）
+    dj_bot_vocaloid_synth_bias: float = 1.0
 
     # 専用局（24時間常設）の自律運行エンジン
     dedicated_engine_enabled: bool = True
@@ -112,6 +136,21 @@ class Settings(BaseSettings):
     # 開局できる周波数レンジ（MHz）
     station_freq_min: float = 76.0
     station_freq_max: float = 88.9
+
+    # --- 周波数帯の区分（総スロット数は増やさない） ---
+    # 専用局（24時間常設・申請承認制）を開設できる帯。
+    # この帯の外は「自由な周波数」＝誰でも自由に開局・時間枠予約できる一般帯として扱う。
+    # （既定: 76.0〜79.9MHz＝専用局帯 / 80.0〜88.9MHz＝自由な周波数）
+    dedicated_freq_min: float = 76.0
+    dedicated_freq_max: float = 79.9
+
+    # --- 切り忘れ対策（放送の停波忘れ防止） ---
+    # ON AIR からこの分数が過ぎたら自動停波する（0 = 無効）
+    auto_off_after_minutes: int = 360
+    # 無人（リスナー0人・チャットなし）のままこの分数が過ぎたら自動停波（0 = 無効）
+    auto_off_idle_minutes: int = 120
+    # 自動停波の何分前に放送内で告知するか（0 = 告知なし）
+    auto_off_notice_minutes: int = 5
 
     # CORS 許可オリジン
     cors_origins: str = "*"

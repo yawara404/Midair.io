@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
+from app.core.bands import validate_dedicated_frequency
 from app.core.database import get_db
 from app.core.security import require_user
 from app.core.utils import parse_youtube_id
@@ -89,13 +89,8 @@ async def apply_dedicated(
     user: User = Depends(require_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """専用局の開設申請（listener 以上）。"""
-    freq = round(float(data.desired_frequency), 1)
-    if freq < settings.station_freq_min or freq > settings.station_freq_max:
-        raise HTTPException(
-            status_code=400,
-            detail=f"周波数は{settings.station_freq_min:.1f}〜{settings.station_freq_max:.1f}MHzの範囲で指定してください",
-        )
+    """専用局の開設申請（listener 以上）。専用局帯からのみ。"""
+    freq = validate_dedicated_frequency(data.desired_frequency)
     if not (data.callsign or "").strip():
         raise HTTPException(status_code=400, detail="コールサイン（局名）を入力してください")
     if not (data.station_title or "").strip():
@@ -216,7 +211,7 @@ async def admin_approve_application(
     if application.status != "pending":
         raise HTTPException(status_code=409, detail="この申請は既に審査済みです")
 
-    freq = round(float(application.desired_frequency), 1)
+    freq = validate_dedicated_frequency(application.desired_frequency)
     existing = (
         await db.execute(select(Station).where(Station.frequency == freq))
     ).scalars().first()

@@ -33,8 +33,13 @@ from app.routers import (
 from app.routers.frequencies import broadcast_frequency_status
 from app.services import discord_bot
 from app.services.ai_dj import generate_dj_line
+from app.services.auto_off import check_auto_off
 from app.services.bot_dj import play_limit_seconds, play_next
-from app.services.sessions import close_session, open_session
+from app.services.sessions import (
+    close_session,
+    dj_track_context,
+    open_session,
+)
 from app.services.websocket_manager import manager
 
 # 管理者アカウント（初期シード）。値は .env で設定する（既定は開発用のダミー）。
@@ -53,8 +58,11 @@ _BOT_PRESETS = [
     {
         "name": "Vocaloid BOT",
         "frequency": 85.0,
-        "description": "ボカロ曲をランダムに流し続ける自動DJ局。",
-        "prompt": "ボカロ好きのための自動DJ。",
+        "description": (
+            "合成音声（ボカロ等）の歌声を優先して流し続ける自動DJ局。"
+            "人の歌唱（歌ってみた）は流しません。"
+        ),
+        "prompt": "合成音声の歌声（ボカロ曲）だけをかける、ボカロ好きのための自動DJ。",
     },
 ]
 
@@ -212,6 +220,15 @@ async def _ensure_bot_stations(session, admin: User) -> None:
             await session.refresh(station)
             await open_session(session, station, title=f"{preset['name']} 放送")
 
+        # プリセット局の説明とキャラ設定は最新に保つ（選曲方針の変更を反映する）
+        if (
+            station.description != preset["description"]
+            or station.ai_dj_prompt != preset["prompt"]
+        ):
+            station.description = preset["description"]
+            station.ai_dj_prompt = preset["prompt"]
+            await session.commit()
+
         # 自動DJ設定（未登録なら作る）
         if await session.get(BotStation, station.id) is None:
             session.add(
@@ -286,7 +303,17 @@ async def _dj_loop() -> None:
                     continue
                 program = station.callsign
                 persona = station.ai_dj_prompt
-            line = await generate_dj_line(program, persona=persona)
+                # 今オンエア中の曲（と直前の曲）を渡して、曲に連動したコメントにする
+                track_label = None
+                recent_label = None
+                if settings.dj_track_comment_enabled:
+                    track_label, recent_label = await dj_track_context(session, station)
+            line = await generate_dj_line(
+                program,
+                persona=persona,
+                track=track_label,
+                recent=recent_label,
+            )
             if not line:
                 # LLM未設定・失敗時は何も投稿しない（定型文は使わない）
                 manager.touch(station_id)
@@ -415,6 +442,9 @@ async def _lifecycle_loop() -> None:
 
             if started or ended or expired or program_changed:
                 await session.commit()
+
+            # 切り忘れ対策: ON AIR しっぱなしの局を自動停波する
+            await check_auto_off(session)
 
 
 @asynccontextmanager

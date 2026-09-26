@@ -2,8 +2,10 @@
 
 - trending:  YouTube mostPopular（ミュージック）から人気曲を取得
 - search:    YouTube 検索（任意クエリ）から曲を取得
-- vocaloid:  歌声・ジャンル・年代・プロデューサー別の検索テーマを巡回し、
-             候補を蓄積しながら選曲する
+- vocaloid:  歌声合成（ボカロ等）の歌声・ジャンル・年代・プロデューサー・
+             歌声合成エンジン別の検索テーマを巡回し、候補を蓄積しながら選曲する。
+             歌声合成のクレジットが確認できる曲（＝合成音声の歌唱）だけを流す
+             （合成音声歌唱優先）。
 
 いずれも「埋め込み再生できる通常動画」だけを採用し、ランダムに1曲選ぶ。
 APIキー未設定・取得失敗時は埋め込み可能な内蔵プールにフォールバックする。
@@ -66,6 +68,19 @@ _VOCALOID_GENRES = [
     "ボカロ 切ない 名曲",
     "ボカロ 疾走感 オリジナル曲",
 ]
+# 歌声合成エンジン別（VOCALOID / Synthesizer V / CeVIO など）。
+# 人の歌唱（歌ってみた）ではなく合成音声が歌う曲だけを集めるため、
+# エンジン名でもテーマを引き、歌声の種類をばらけさせる。
+_VOCALOID_ENGINES = [
+    "VOCALOID オリジナル曲",
+    "Synthesizer V オリジナル曲",
+    "CeVIO オリジナル曲",
+    "VOICEROID オリジナル曲",
+    "UTAU オリジナル曲",
+    "NEUTRINO 歌",
+    "NEUTRINO オリジナル曲",
+    "VOICEVOX 歌",
+]
 _VOCALOID_PRODUCERS = [
     "DECO*27", "ピノキオピー", "稲葉曇", "ハチ", "wowaka", "みきとP",
     "kemu", "Neru", "40mP", "ナユタン星人", "じん", "はるまきごはん",
@@ -87,6 +102,7 @@ _VOCALOID_PRODUCER_ALIASES: dict[str, tuple] = {
 _VOCALOID_THEMES: list[dict] = [
     *[{"family": "character", "query": q} for q in _VOCALOID_CHARACTERS],
     *[{"family": "genre", "query": q} for q in _VOCALOID_GENRES],
+    *[{"family": "engine", "query": q} for q in _VOCALOID_ENGINES],
     # 新曲（公開日順・最近のもの）と定番（再生数順・殿堂入り）を分けて候補に入れる
     {"family": "era", "query": "ボカロ 新曲 オリジナル曲", "order": "date",
      "published_after_days": 90},
@@ -136,11 +152,24 @@ def _remember_channel(channel: Optional[str]) -> None:
 
 
 def _fallback_items(source: str = "trending") -> list[dict]:
+    """内蔵プール（APIキー未設定・取得失敗時）。Vocaloid BOT は全て合成音声の歌唱。"""
     tracks = _VOCALOID_FALLBACK if source == "vocaloid" else _FALLBACK
-    return [
-        {"youtube_id": vid, "title": title, "duration": None, "fallback": True}
-        for vid, title in tracks
-    ]
+    items = []
+    for vid, title in tracks:
+        # 歌声合成のクレジット（タイトルにあれば 2、無ければ 1）を付けておく
+        level = 0
+        if source == "vocaloid":
+            level = 2 if _voice_credit(_normalize_text(title), _word_text(title)) else 1
+        items.append(
+            {
+                "youtube_id": vid,
+                "title": title,
+                "duration": None,
+                "fallback": True,
+                "synth_level": level,
+            }
+        )
+    return items
 
 
 def mark_failed(video_id: Optional[str]) -> None:
@@ -158,11 +187,12 @@ _SHORTS_MARKERS = (
 )
 # これ未満の動画は「曲」ではなく Shorts・クリップとみなす
 _MIN_SONG_SECONDS = 90
-# 人の歌唱（歌ってみた・セルフカバー等）を示す目印。
+# 人の歌唱（歌ってみた・演奏してみた等）を示す目印。
 # タイトルだけでなくタグ・説明欄でも探す（タイトルに書かれないことが多いため）。
 # 日本語の目印は、空白・記号を除いた文字列に含まれるかで判定する。
 _HUMAN_JP_MARKERS = (
-    "歌ってみた", "歌わせてみた", "弾いてみた", "カバー", "歌い手",
+    "歌ってみた", "歌わせてみた", "歌ってみました", "歌いました", "歌い手",
+    "弾いてみた", "演奏してみた", "カバー",
 )
 # 英字の目印は「単語として」現れるかで判定する
 # （sunflower / discover のような語を cover と誤検出しないため）
@@ -177,16 +207,38 @@ _SELF_VOCAL_EN_MARKERS = ("self cover", "selfcover", "self-cover", "self vocal")
 # 曲ではなく宣伝・クロスフェード等の動画
 _NON_SONG_JP_MARKERS = ("トレーラー", "クロスフェード", "試聴", "予告")
 _NON_SONG_EN_MARKERS = ("trailer", "teaser", "crossfade", "digest", "preview")
-# 歌声合成（ボカロ・音声合成）のクレジット。あれば人の歌唱でも候補に残す。
+# 歌声合成（VOCALOID / Synthesizer V / CeVIO / VOICEROID / UTAU など）のクレジット。
+# キャラクター名とエンジン名の両方を見て「合成音声の歌唱」かどうかを判定する。
+# 合成音声歌唱優先のため、これが確認できない曲は Vocaloid BOT では流さない。
+# 日本語の目印（空白・記号を除いた文字列に含まれるかで判定）
 _VOICE_SYNTH_JP_MARKERS = (
-    "初音ミク", "ミク", "ボカロ", "鏡音", "巡音", "ルカ", "重音テト", "可不",
-    "星界", "歌愛ユキ", "結月ゆかり", "ずんだもん", "波音リツ", "ボイスロイド",
+    # VOCALOID / Synthesizer V / CeVIO / VOICEROID / UTAU / A.I.VOICE 等の歌声
+    "初音ミク", "ミク", "鏡音", "巡音", "ルカ", "重音テト", "歌愛ユキ",
+    "結月ゆかり", "波音リツ", "音街ウナ", "可不", "星界", "裏命", "狐子",
+    "羽累", "宮舞モカ", "琴葉茜", "琴葉葵", "紲星あかり",
+    "東北ずん子", "東北きりたん", "ずんだもん", "四国めたん", "春日部つむぎ",
+    "小春六花", "夏色花梨", "花隈千冬", "鳴花ヒメ", "鳴花ミコト",
+    "メグッポイド", "蒼姫ラピス",
+    # エンジン・種別名
+    "ボカロ", "ボーカロイド", "ボイスロイド", "歌声合成", "歌唱合成",
 )
-# 英字の歌声名も単語として判定する（ia / flower 等の短い名前を安全に扱う）
+# 英字の歌声名・エンジン名も単語として判定する（ia / flower 等の短い名前を安全に扱う）
 _VOICE_SYNTH_EN_MARKERS = (
-    "vocaloid", "cevio", "synthv", "voiceroid", "vflower",
-    "hatsune miku", "miku", "ia", "gumi", "meiko", "kaito", "flower",
+    # エンジン名
+    "vocaloid", "cevio", "synthv", "synthesizer", "voiceroid", "aivoice",
+    "utau", "neutrino", "voicevox", "vflower",
+    # キャラクター名
+    "hatsune miku", "miku", "kagamine", "megurine luka", "luka", "meiko",
+    "kaito", "gumi", "megpoid", "ia", "flower", "fukase", "yuzuki yukari",
+    "yukari", "teto", "kasane teto", "kafu", "sekai", "zundamon", "una",
 )
+# 「初音ミクが歌ってみた」「ずんだもん cover」のように、合成音声自身が歌う書き方。
+# タイトルに人の歌唱の目印（歌ってみた・カバー）があっても、この形なら
+# 合成音声の歌唱として候補に残す。
+_SYNTH_SING_JP_SUFFIXES = (
+    "が歌ってみた", "も歌ってみた", "の歌ってみた", "歌ってみた", "が歌う", "が唄う",
+)
+_SYNTH_SING_EN_SUFFIXES = ("cover", "covers", "sings", "singing")
 # Vocaloid BOT が候補として採用する長さの範囲（長いミックスは10分上限で除外）
 _VOCALOID_MIN_SECONDS = _MIN_SONG_SECONDS
 _VOCALOID_MAX_SECONDS = 600
@@ -251,9 +303,54 @@ def _view_count(item: dict) -> Optional[int]:
 
 
 def _voice_credit(compact: str, words: str) -> bool:
-    """歌声合成（ボカロ）のクレジットがあるか（日本語・英字の両方を見る）。"""
+    """歌声合成（VOCALOID / Synthesizer V / CeVIO など）のクレジットがあるか。
+
+    日本語（キャラクター名・エンジン名）と英字（単語として現れる名前）の
+    両方を見る。あればその動画は合成音声が歌っている可能性が高い。
+    """
     return _has_jp(compact, _VOICE_SYNTH_JP_MARKERS) or _has_en(
         words, _VOICE_SYNTH_EN_MARKERS
+    )
+
+
+def _synth_credit_level(item: dict) -> int:
+    """歌声合成のクレジットの強さを返す（合成音声歌唱優先の判定に使う）。
+
+    2 = タイトルにクレジットがある（＝合成音声が歌っていることがほぼ確実）
+    1 = タグ・説明欄・投稿者名にクレジットがある
+    0 = どこにも無い（合成音声の歌唱と確認できない）
+    """
+    snippet = item.get("snippet", {})
+    raw_title = snippet.get("title")
+    if _voice_credit(_normalize_text(raw_title), _word_text(raw_title)):
+        return 2
+    raw_tags = " ".join(snippet.get("tags") or [])
+    raw_meta = (
+        f"{raw_tags} {snippet.get('description') or ''} {snippet.get('channelTitle') or ''}"
+    )
+    if _voice_credit(_normalize_text(raw_meta), _word_text(raw_meta)):
+        return 1
+    return 0
+
+
+def _synth_sings_in_title(compact: str, words: str) -> bool:
+    """タイトルが「合成音声自身が歌っている」書き方かどうか。
+
+    「初音ミクが歌ってみた」「ずんだもん cover」のように、人の歌唱の目印
+    （歌ってみた・カバー）が合成音声を主語に使われている場合は、人の歌唱を
+    示す目印として扱わない（＝合成音声の歌唱として候補に残す）。
+    """
+    if any(
+        f"{vocal}{suffix}" in compact
+        for vocal in _VOICE_SYNTH_JP_MARKERS
+        for suffix in _SYNTH_SING_JP_SUFFIXES
+    ):
+        return True
+    padded = f" {words} "
+    return any(
+        f" {vocal} {suffix} " in padded
+        for vocal in _VOICE_SYNTH_EN_MARKERS
+        for suffix in _SYNTH_SING_EN_SUFFIXES
     )
 
 
@@ -292,6 +389,8 @@ def _unfit_reason(item: dict, producer: Optional[str] = None) -> Optional[str]:
     プロデューサー名で検索すると、そのPの曲を人間が歌った動画（歌ってみた）や
     別アーティストの動画、アルバムの宣伝・クロスフェードも混ざるため、
     メタ情報（タイトル / タグ / 説明欄 / チャンネル）から判定して除外する。
+    合成音声歌唱優先のため、歌声合成のクレジットが確認できない曲も除外する
+    （settings.dj_bot_vocaloid_synth_only）。
     """
     snippet = item.get("snippet", {})
     raw_title = snippet.get("title")
@@ -314,37 +413,47 @@ def _unfit_reason(item: dict, producer: Optional[str] = None) -> Optional[str]:
     ):
         return "宣伝・クロスフェード等"
 
-    # タイトルに歌声合成のクレジットがあれば、ボカロによるカバー曲として残す
-    if _voice_credit(title, title_words):
-        return None
-
     # ボカロP本人の歌唱（セルフカバー・本人歌唱）はできるだけ避ける
     if _has_jp(f"{title} {meta}", _SELF_VOCAL_JP_MARKERS) or _has_en(
         f"{title_words} {meta_words}", _SELF_VOCAL_EN_MARKERS
     ):
         return "P本人の歌唱"
 
-    # タイトル自体が「歌ってみた」「(cover)」なら人の歌唱（クレジットは上で確認済み）
-    if _has_jp(title, _HUMAN_JP_MARKERS) or _has_en(title_words, _HUMAN_EN_MARKERS):
+    # タイトルが人の歌唱（歌ってみた・カバー）でも、合成音声自身が歌う書き方
+    # （「初音ミクが歌ってみた」等）なら合成音声の歌唱として候補に残す
+    if (
+        _has_jp(title, _HUMAN_JP_MARKERS) or _has_en(title_words, _HUMAN_EN_MARKERS)
+    ) and not _synth_sings_in_title(title, title_words):
         return "人の歌唱"
 
-    trusted = _channel_is_trusted(channel, producer)
-    # タグ・説明欄の目印は、ボカロ公式・既知のPのチャンネルなら見逃す
-    # （ボカロ曲の投稿でもタグに「歌ってみた」が付くことがあるため）
-    if not trusted and (_has_jp(meta, _HUMAN_JP_MARKERS) or _has_en(meta_words, _HUMAN_EN_MARKERS)):
-        return "人の歌唱"
+    # 歌声合成のクレジットの強さ（2=タイトル / 1=タグ・説明欄・投稿者名 / 0=無し）
+    synth_level = _synth_credit_level(item)
 
-    if not trusted:
-        # タイトルにクレジットが無く、ボカロ公式・既知のPのチャンネルでもない
-        # → 人間の歌唱や別アーティストの動画（カバー等）なので除外する
-        return "別アーティスト"
+    if not _channel_is_trusted(channel, producer):
+        # ボカロ公式・既知のPのチャンネルではないので、タイトルに歌声合成の
+        # クレジットがある動画だけを候補にする（人の歌唱・別アーティストを避ける）
+        if synth_level < 2:
+            return "別アーティスト"
+        # タイトルにクレジットがあっても、タグ・説明欄が人の歌唱を示すなら除外する
+        # （本家のクレジットとしてボカロ名を書く「歌ってみた」動画を避けるため）
+        if _has_jp(meta, _HUMAN_JP_MARKERS) or _has_en(meta_words, _HUMAN_EN_MARKERS):
+            return "人の歌唱"
+        return None
+
+    # ここから下はボカロ公式・既知のボカロP本人のチャンネル。
+    # タグ・説明欄の「歌ってみた」は、ボカロ曲の投稿でも付くことがあるため見逃す。
+    # その代わり、合成音声歌唱優先で、歌声合成のクレジットが確認できない曲
+    # （インスト・P本人の歌唱など）は流さない。
+    if settings.dj_bot_vocaloid_synth_only and synth_level == 0:
+        return "歌声合成のクレジット無し"
     return None
 
 
 def _filter_items(items: list[dict], theme: Optional[dict] = None) -> list[dict]:
     """埋め込み可能な通常動画だけを抽出する（Shorts は除外）。
 
-    theme を渡すと Vocaloid BOT 用の判定（人の歌唱・別アーティスト等）も行う。
+    theme を渡すと Vocaloid BOT 用の判定（人の歌唱・別アーティスト等）も行い、
+    歌声合成のクレジットの強さ（synth_level）を候補に付ける。
     """
     out = []
     min_views = max(0, settings.dj_bot_min_views)
@@ -363,8 +472,11 @@ def _filter_items(items: list[dict], theme: Optional[dict] = None) -> list[dict]
         # 曲として聴けない Shorts・極端に短いクリップは選曲候補から外す
         if _looks_like_shorts(item):
             continue
-        if theme is not None and _unfit_reason(item, theme.get("producer")):
-            continue
+        synth_level = 0
+        if theme is not None:
+            if _unfit_reason(item, theme.get("producer")):
+                continue
+            synth_level = _synth_credit_level(item)
         views = _view_count(item)
         # 再生数が少なすぎる動画（無人気の投稿）は選曲候補から外す
         if views is not None and views <= min_views:
@@ -378,6 +490,7 @@ def _filter_items(items: list[dict], theme: Optional[dict] = None) -> list[dict]
                 "duration": parse_iso_duration(
                     item.get("contentDetails", {}).get("duration")
                 ),
+                "synth_level": synth_level,
             }
         )
     return out
@@ -596,18 +709,24 @@ async def pool(source: str = "trending", query: Optional[str] = None) -> list[di
     return items
 
 
-def _popularity_weight(item: dict) -> float:
+def _popularity_weight(item: dict, source: str = "trending") -> float:
     """選曲の重み。再生数が多い曲ほど選ばれやすくする（人気曲優先）。
 
     dj_bot_popularity_power で強さを変える（0=等倍＝完全ランダム、
     0.5=控えめに人気曲を優先、1.0=再生数に比例）。
+    Vocaloid BOT では合成音声歌唱優先のため、タイトルに歌声合成のクレジットが
+    ある曲（synth_level=2）の重みを dj_bot_vocaloid_synth_bias 倍する。
     """
     power = max(0.0, min(float(settings.dj_bot_popularity_power), 2.0))
     views = item.get("views") or 0
     if power <= 0 or views <= 0:
         # 重み付け無効、または再生数が不明（フォールバック曲など）は等倍
-        return 1.0
-    return float(views) ** power
+        weight = 1.0
+    else:
+        weight = float(views) ** power
+    if source == "vocaloid" and item.get("synth_level") == 2:
+        weight *= 1.0 + max(0.0, float(settings.dj_bot_vocaloid_synth_bias))
+    return weight
 
 
 async def random_track(
@@ -626,6 +745,11 @@ async def random_track(
         # 選曲を続ける。ここで空を返すと局が同じ曲のまま止まってしまう。
         _failed_ids.clear()
         candidates = items
+    if source == "vocaloid":
+        # 合成音声歌唱優先: 歌声合成のクレジットが確認できる曲だけを対象にする
+        # （古い候補プールや内蔵プールが混ざっていても人の歌唱を流さない）
+        credited = [x for x in candidates if (x.get("synth_level") or 0) > 0]
+        candidates = credited or candidates
     recent = {vid for vid in (exclude_ids or ()) if vid}
     if exclude_id:
         recent.add(exclude_id)
@@ -641,8 +765,9 @@ async def random_track(
         and (x.get("channel") or "").strip() not in recent_channels
     ]
     finalists = preferred or choices
-    # 再生数の多い曲ほど選ばれやすくする（人気曲優先。重みが全て等倍なら一様抽選）
-    weights = [_popularity_weight(x) for x in finalists]
+    # 再生数の多い曲ほど選ばれやすくする（人気曲優先。重みが全て等倍なら一様抽選）。
+    # 加えて Vocaloid BOT はタイトルに歌声合成のクレジットがある曲を優先する。
+    weights = [_popularity_weight(x, source) for x in finalists]
     if all(weight == 1.0 for weight in weights):
         pick = random.choice(finalists)
     else:

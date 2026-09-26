@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.models import BroadcastSession, SessionTrack, Station
 from app.services.discord_sync import send_to_discord
+from app.services.dj_announce import schedule_track_change
 from app.services.sessions import record_track
 from app.services.trending import random_track
 from app.services.websocket_manager import manager
@@ -134,4 +135,6 @@ async def play_next(db: AsyncSession, station: Station) -> bool:
         f"🤖 {station.callsign} 再生中: {label} — https://youtu.be/{pick['youtube_id']}",
         station.callsign,
     )
+    # 曲が切り替わったらDJが曲紹介コメントを投稿する（今流れている曲に連動）
+    schedule_track_change(station.id, pick["youtube_id"], pick.get("title"))
     return True

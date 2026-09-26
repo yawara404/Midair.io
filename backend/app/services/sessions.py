@@ -78,6 +78,92 @@ async def current_offset(
     return session.id, offset
 
 
+async def resolve_track_title(
+    db: AsyncSession, station_id: int, youtube_id: str, title: Optional[str] = None
+) -> str:
+    """曲名を解決する（渡された title → 選曲ログ → YouTube 情報 の順）。
+
+    DJコメントに「今流れている曲」を渡すために使う。
+    どの方法でも分からないときは動画IDを返す。
+    """
+    if title:
+        return title
+    if not youtube_id:
+        return ""
+    session = await get_open_session(db, station_id)
+    if session is not None:
+        logged = (
+            await db.execute(
+                select(SessionTrack.title)
+                .where(
+                    SessionTrack.session_id == session.id,
+                    SessionTrack.youtube_id == youtube_id,
+                )
+                .order_by(SessionTrack.id.desc())
+            )
+        ).scalars().first()
+        if logged:
+            return logged
+    fetched = await fetch_youtube_title(youtube_id)
+    return fetched or youtube_id
+
+
+async def current_track(db: AsyncSession, station: Station) -> dict:
+    """今オンエア中の曲 {youtube_id, title} を返す（曲が無ければ空の辞書）。"""
+    if not station.current_youtube_id:
+        return {}
+    return {
+        "youtube_id": station.current_youtube_id,
+        "title": await resolve_track_title(db, station.id, station.current_youtube_id),
+    }
+
+
+async def recent_track_titles(
+    db: AsyncSession, station_id: int, limit: int = 5, exclude_id: Optional[str] = None
+) -> list[str]:
+    """直近に流れた曲名を新しい順に返す（exclude_id の曲を除ける）。DJコメントの話題づくりに使う。"""
+    if limit <= 0:
+        return []
+    query = (
+        select(SessionTrack.title)
+        .join(BroadcastSession, SessionTrack.session_id == BroadcastSession.id)
+        .where(BroadcastSession.station_id == station_id)
+    )
+    if exclude_id:
+        query = query.where(SessionTrack.youtube_id != exclude_id)
+    query = query.order_by(SessionTrack.id.desc()).limit(limit)
+    return [title for title in (await db.execute(query)).scalars() if title]
+
+
+async def dj_track_context(
+    db: AsyncSession, station: Station
+) -> tuple[Optional[str], Optional[str]]:
+    """DJコメント用の「今オンエア中の曲名」と「直前までの曲名（A → B 形式）」を返す。
+
+    ai_dj.generate_dj_line(track=..., recent=...) にそのまま渡せる形。
+    """
+    info = await current_track(db, station)
+    recent = await recent_track_titles(
+        db, station.id, limit=3, exclude_id=info.get("youtube_id")
+    )
+    return info.get("title"), " → ".join(recent)
+
+
+async def recent_chat_context(
+    db: AsyncSession, station_id: int, limit: int = 6
+) -> str:
+    """直近のチャットを「名前: 内容」で連結して返す（DJコメントの文脈用）。"""
+    rows = (
+        await db.execute(
+            select(Message)
+            .where(Message.station_id == station_id)
+            .order_by(Message.id.desc())
+            .limit(max(1, limit))
+        )
+    ).scalars().all()
+    return "\n".join(f"{m.sender_name}: {m.content}" for m in reversed(rows))
+
+
 async def record_track(
     db: AsyncSession, station_id: int, youtube_id: str, title: Optional[str] = None
 ) -> Optional[SessionTrack]:

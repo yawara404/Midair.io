@@ -1,6 +1,12 @@
 <template>
   <div class="studio">
     <h2 class="studio__title">スタジオ</h2>
+
+    <!-- 切り忘れ対策（自動停波）の案内 -->
+    <p v-if="autoOffText" class="studio__note">
+      ⏱ {{ autoOffText }}
+    </p>
+
     <p v-if="!auth.isLoggedIn" class="studio__guest">
       スタジオを使うにはログインしてください。
       <router-link to="/login">ログイン</router-link>
@@ -72,14 +78,32 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { api } from '../api'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const mine = ref([])
+const autoOff = ref(null)
 const bgmUrl = reactive({})
 const newProg = reactive({})
+
+function minutesText(minutes) {
+  if (minutes >= 60 && minutes % 60 === 0) return `${minutes / 60}時間`
+  return `${minutes}分`
+}
+
+// 切り忘れ対策（自動停波）の説明（設定は /bands から取得）
+const autoOffText = computed(() => {
+  const cfg = autoOff.value
+  if (!cfg) return ''
+  const parts = []
+  if (cfg.idle_minutes > 0) parts.push(`無人（リスナー0人・チャットなし）のまま${minutesText(cfg.idle_minutes)}`)
+  if (cfg.after_minutes > 0) parts.push(`ON AIR から${minutesText(cfg.after_minutes)}`)
+  if (!parts.length) return ''
+  const notice = cfg.notice_minutes > 0 ? `（停波の${minutesText(cfg.notice_minutes)}前に放送内で告知します）` : ''
+  return `切り忘れ対策: ${parts.join('、または ')}経過すると自動で停波します${notice}。24時間流し続けたい場合は専用局（24時間常設）を申請してください（専用局・自動DJ局・番組枠は対象外）。`
+})
 
 function fmt(iso) {
   if (!iso) return ''
@@ -92,6 +116,15 @@ function fmtTime(iso) {
   const d = new Date(iso)
   const pad = (n) => String(n).padStart(2, '0')
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+async function loadAutoOff() {
+  try {
+    const res = await api('/bands')
+    autoOff.value = res.auto_off || null
+  } catch (e) {
+    autoOff.value = null
+  }
 }
 
 async function load() {
@@ -213,7 +246,10 @@ async function deleteProgram(p) {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  loadAutoOff()
+  load()
+})
 </script>
 
 <style scoped>
@@ -225,6 +261,16 @@ onMounted(load)
 .studio__guest {
   color: var(--text-dim);
   font-size: 14px;
+}
+.studio__note {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--green);
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.7;
 }
 .studio__guest a {
   color: var(--green);

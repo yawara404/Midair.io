@@ -33,6 +33,10 @@
         DJを呼ぶ
       </button>
     </div>
+
+    <p class="input__hint">
+      DJは「DJさん」「hey DJ」と呼びかけたときだけ返事します（大文字小文字は問いません）
+    </p>
   </div>
 </template>
 
@@ -109,6 +113,13 @@ function callDj() {
 }
 .input__field--yt {
   font-size: 13px;
+}
+
+.input__hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--faint);
+  line-height: 1.6;
 }
 
 @media (max-width: 640px) {

@@ -12,6 +12,13 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.bands import (
+    all_frequencies,
+    band_of,
+    bands_payload,
+    validate_free_frequency,
+    validate_range,
+)
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import require_user
@@ -41,23 +48,12 @@ def _now() -> datetime:
 
 
 def _all_frequencies() -> list[float]:
-    """76.0〜88.9MHz の全スロットを返す。"""
-    out: list[float] = []
-    freq = settings.station_freq_min
-    while freq <= settings.station_freq_max + 1e-9:
-        out.append(round(freq, 1))
-        freq += 0.1
-    return out
+    """76.0〜88.9MHz の全スロットを返す（総数は帯域分けで増減しない）。"""
+    return all_frequencies()
 
 
 def _validate_freq(frequency: float) -> float:
-    freq = round(frequency, 1)
-    if freq < settings.station_freq_min or freq > settings.station_freq_max:
-        raise HTTPException(
-            status_code=400,
-            detail=f"周波数は{settings.station_freq_min:.1f}〜{settings.station_freq_max:.1f}MHzの範囲で指定してください",
-        )
-    return freq
+    return validate_range(frequency)
 
 
 async def broadcast_frequency_status(
@@ -81,9 +77,18 @@ class ReserveIn(BaseModel):
     end_time: datetime
 
 
+@router.get("/bands")
+async def list_bands():
+    """周波数帯の区分（専用局帯 / 自由な周波数）と切り忘れ対策の設定。
+
+    総スロット数は変えずに帯域を分けている（専用局＝24時間常設の申請先）。
+    """
+    return {"success": True, **bands_payload()}
+
+
 @router.get("/frequencies")
 async def list_frequencies(db: AsyncSession = Depends(get_db)):
-    """全190スロットの状態一覧（EMPTY / RESERVED / LIVE / OFF AIR）。"""
+    """全スロットの状態一覧（EMPTY / RESERVED / LIVE / OFF AIR）。"""
     now = _now()
     stations = (await db.execute(select(Station))).scalars().all()
     by_freq = {round(s.frequency, 1): s for s in stations}
@@ -107,11 +112,13 @@ async def list_frequencies(db: AsyncSession = Depends(get_db)):
             slots.append(
                 {
                     "frequency": f,
+                    "band": band_of(f),
                     "status": station.status,
                     "station_id": station.id,
                     "callsign": station.callsign,
                     "owner_username": station.owner.username if station.owner else None,
                     "listener_count": manager.channel_count(station.id),
+                    "is_dedicated": bool(station.is_dedicated),
                     "reservation": None,
                 }
             )
@@ -120,11 +127,13 @@ async def list_frequencies(db: AsyncSession = Depends(get_db)):
             slots.append(
                 {
                     "frequency": f,
+                    "band": band_of(f),
                     "status": "reserved",
                     "station_id": None,
                     "callsign": r.callsign or "予約枠",
                     "owner_username": r.user.username if r.user else None,
                     "listener_count": 0,
+                    "is_dedicated": False,
                     "reservation": r.to_dict(),
                 }
             )
@@ -132,11 +141,13 @@ async def list_frequencies(db: AsyncSession = Depends(get_db)):
             slots.append(
                 {
                     "frequency": f,
+                    "band": band_of(f),
                     "status": "empty",
                     "station_id": None,
                     "callsign": None,
                     "owner_username": None,
                     "listener_count": 0,
+                    "is_dedicated": False,
                     "reservation": None,
                 }
             )
@@ -145,12 +156,15 @@ async def list_frequencies(db: AsyncSession = Depends(get_db)):
     for s in slots:
         counts[s["status"]] = counts.get(s["status"], 0) + 1
 
+    info = bands_payload()
     return {
         "success": True,
         "min": settings.station_freq_min,
         "max": settings.station_freq_max,
         "count": len(slots),
         "counts": counts,
+        "bands": info["bands"],
+        "auto_off": info["auto_off"],
         "slots": slots,
     }
 
@@ -159,6 +173,7 @@ async def list_frequencies(db: AsyncSession = Depends(get_db)):
 async def get_frequency(frequency: float, db: AsyncSession = Depends(get_db)):
     """単一スロットの状態。"""
     f = _validate_freq(frequency)
+    band = band_of(f)
     station = (
         await db.execute(select(Station).where(Station.frequency == f))
     ).scalars().first()
@@ -166,6 +181,7 @@ async def get_frequency(frequency: float, db: AsyncSession = Depends(get_db)):
         return {
             "success": True,
             "frequency": f,
+            "band": band,
             "status": station.status,
             "station": station.to_dict(),
             "reservation": None,
@@ -185,6 +201,7 @@ async def get_frequency(frequency: float, db: AsyncSession = Depends(get_db)):
     return {
         "success": True,
         "frequency": f,
+        "band": band,
         "status": "reserved" if r else "empty",
         "station": None,
         "reservation": r.to_dict() if r else None,
@@ -202,7 +219,8 @@ async def _do_reserve(
     user: User,
     db: AsyncSession,
 ) -> Reservation:
-    f = _validate_freq(frequency)
+    # 時間枠予約は「自由な周波数」（専用局帯以外）のみ
+    f = validate_free_frequency(frequency)
     if end_time <= start_time:
         raise HTTPException(status_code=400, detail="終了時刻は開始時刻より後を指定してください")
 

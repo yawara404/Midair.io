@@ -4,11 +4,16 @@
       <div class="fmap__head-main">
         <h2>周波数マップ</h2>
         <p class="fmap__sub">
-          76.0〜88.9MHz ・ 全{{ slots.length }}スロット ・ 空き検索 / 時間枠予約 / 開局 / ON AIR・停波
+          76.0〜88.9MHz ・ 全{{ slots.length }}スロット ・
+          <template v-for="(b, i) in bands" :key="b.key + b.min">
+            <span v-if="i"> / </span>{{ b.min.toFixed(1) }}〜{{ b.max.toFixed(1) }}＝{{ bandShortLabel(b) }}
+          </template>
+          ・ 空き検索 / 時間枠予約 / 開局 / ON AIR・停波
         </p>
         <p class="fmap__hint">
-          ▼ 空き（EMPTY＝グレー）のスロットをクリック → 「時間枠を予約する」または「この周波数で開局」
+          ▼ 空き（EMPTY＝グレー）のスロットをクリック → 自由な周波数は「時間枠を予約する」「この周波数で開局」、専用局帯は「専用局を申請」
         </p>
+        <p v-if="autoOffText" class="fmap__note">⏱ {{ autoOffText }}</p>
       </div>
       <div class="fmap__legend">
         <span class="lg lg--empty">EMPTY</span>
@@ -25,29 +30,46 @@
       <span class="count count--off_air"><b>{{ counts.off_air }}</b> 停波</span>
     </div>
 
-    <div class="fmap__grid">
-      <button
-        v-for="s in slots"
-        :key="s.frequency"
-        class="slot"
-        :class="[`slot--${s.status}`, { 'is-selected': selected && selected.frequency === s.frequency }]"
-        :title="`${s.frequency.toFixed(1)} MHz — ${statusLabel(s.status)}`"
-        @click="select(s)"
-      >
-        <span class="slot__freq">{{ s.frequency.toFixed(1) }}</span>
-      </button>
-    </div>
+    <!-- ===== 帯域ごとのスロット一覧（専用局帯 / 自由な周波数） ===== -->
+    <section v-for="b in bandGroups" :key="b.key + '-' + b.min" class="band">
+      <div class="band__head">
+        <span class="band__label" :class="{ 'is-dedicated': b.dedicated }">{{ b.label }}</span>
+        <span class="band__range">{{ b.min.toFixed(1) }}〜{{ b.max.toFixed(1) }}MHz</span>
+        <span class="band__count">{{ b.slots.length }}スロット</span>
+        <span class="band__desc">{{ b.description }}</span>
+      </div>
+      <div class="fmap__grid">
+        <button
+          v-for="s in b.slots"
+          :key="s.frequency"
+          class="slot"
+          :class="[`slot--${s.status}`, { 'is-selected': selected && selected.frequency === s.frequency }]"
+          :title="`${s.frequency.toFixed(1)} MHz — ${statusLabel(s.status)}`"
+          @click="select(s)"
+        >
+          <span class="slot__freq">{{ s.frequency.toFixed(1) }}</span>
+        </button>
+      </div>
+    </section>
 
     <!-- ===== 専用局（24時間常設）申請 ===== -->
-    <section class="dedicated-block">
+    <section ref="dedicatedBlock" class="dedicated-block">
       <div class="dedicated-block__head">
         <div>
           <h3>専用局（24時間常設）を申請する</h3>
-          <p>承認されると、希望周波数が固定され24時間ノンストップで自動送出される専用局になります。</p>
+          <p>
+            承認されると、希望周波数が固定され24時間ノンストップで自動送出される専用局になります。
+            申請できるのは<strong>専用局帯（{{ dedicatedRangeText }}）</strong>のみ
+            （{{ freeRangeText }}は専用局を作れない自由な周波数です）。専用局は切り忘れ対策の自動停波も対象外です。
+          </p>
         </div>
         <router-link v-if="auth.isAdmin" class="btn btn--ghost" to="/admin">管理者ページ</router-link>
       </div>
-      <DedicatedApplyForm @need-login="goLogin" />
+      <DedicatedApplyForm
+        :band="dedicatedBand"
+        :prefill-frequency="prefillFrequency"
+        @need-login="goLogin"
+      />
     </section>
 
     <!-- ===== 選択スロットの詳細（右下に固定表示） ===== -->
@@ -67,34 +89,51 @@
         <p v-if="selected.reservation" class="detail__meta">
           予約: {{ fmt(selected.reservation.start_time) }} 〜 {{ fmt(selected.reservation.end_time) }}
         </p>
-        <p v-if="selected.status === 'empty'" class="detail__meta">この周波数は空いています。</p>
+        <p v-if="selected.status === 'empty'" class="detail__meta">
+          {{ selected.band === 'dedicated'
+            ? `この帯域（${dedicatedRangeText}）は専用局（24時間常設）専用です。`
+            : 'この周波数は空いています。' }}
+        </p>
 
         <p v-if="!auth.isLoggedIn" class="detail__note">操作にはログインが必要です。</p>
 
-        <!-- 空きスロット: 開局 / 予約 -->
+        <!-- 空きスロット: 自由な周波数は開局 / 予約、専用局帯は専用局の申請へ -->
         <template v-if="selected.status === 'empty' && auth.isLoggedIn">
-          <form class="reserve" @submit.prevent="openStation">
-            <input v-model="openCallsign" class="field-input" placeholder="コールサイン（局名）" required />
-            <button class="btn btn--primary" type="submit">この周波数で開局（ON AIR）</button>
-          </form>
-          <div class="detail__actions">
-            <button class="btn btn--ghost" @click="showReserve = !showReserve">
-              {{ showReserve ? '予約フォームを閉じる' : '時間枠を予約する' }}
-            </button>
-          </div>
-          <form v-if="showReserve" class="reserve" @submit.prevent="doReserve">
-            <input v-model="reserve.callsign" class="field-input" placeholder="枠名（任意）" />
-            <label class="reserve__row">
-              <span>開始</span>
-              <input v-model="reserve.start_time" class="field-input" type="datetime-local" required />
-            </label>
-            <label class="reserve__row">
-              <span>終了</span>
-              <input v-model="reserve.end_time" class="field-input" type="datetime-local" required />
-            </label>
-            <p v-if="error" class="err">{{ error }}</p>
-            <button class="btn btn--amber" type="submit">この枠を予約</button>
-          </form>
+          <template v-if="selected.band === 'dedicated'">
+            <p class="detail__note">
+              専用局帯（{{ dedicatedRangeText }}）では一般の開局・時間枠予約はできません。
+              24時間常設の専用局として申請してください。
+            </p>
+            <div class="detail__actions">
+              <button class="btn btn--primary" @click="applyDedicated">
+                この周波数で専用局を申請する
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <form class="reserve" @submit.prevent="openStation">
+              <input v-model="openCallsign" class="field-input" placeholder="コールサイン（局名）" required />
+              <button class="btn btn--primary" type="submit">この周波数で開局（ON AIR）</button>
+            </form>
+            <div class="detail__actions">
+              <button class="btn btn--ghost" @click="showReserve = !showReserve">
+                {{ showReserve ? '予約フォームを閉じる' : '時間枠を予約する' }}
+              </button>
+            </div>
+            <form v-if="showReserve" class="reserve" @submit.prevent="doReserve">
+              <input v-model="reserve.callsign" class="field-input" placeholder="枠名（任意）" />
+              <label class="reserve__row">
+                <span>開始</span>
+                <input v-model="reserve.start_time" class="field-input" type="datetime-local" required />
+              </label>
+              <label class="reserve__row">
+                <span>終了</span>
+                <input v-model="reserve.end_time" class="field-input" type="datetime-local" required />
+              </label>
+              <p v-if="error" class="err">{{ error }}</p>
+              <button class="btn btn--amber" type="submit">この枠を予約</button>
+            </form>
+          </template>
         </template>
 
         <!-- 予約スロット -->
@@ -127,7 +166,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, getToken, wsHost, wsPath } from '../api'
 import { useAuthStore } from '../stores/auth'
@@ -144,6 +183,11 @@ function goLogin() {
 
 const slots = ref([])
 const counts = reactive({ empty: 0, reserved: 0, live: 0, off_air: 0 })
+// 周波数帯（専用局帯 / 自由な周波数）と切り忘れ対策の設定
+const bands = ref([])
+const autoOff = ref(null)
+const prefillFrequency = ref(null)
+const dedicatedBlock = ref(null)
 const selected = ref(null)
 const showReserve = ref(false)
 const error = ref('')
@@ -151,6 +195,52 @@ const openCallsign = ref('')
 const reserve = reactive({ callsign: '', start_time: '', end_time: '' })
 const myStationIds = ref([])
 let socket = null
+
+function bandShortLabel(band) {
+  return band.dedicated ? '専用局帯（24時間常設）' : '自由な周波数'
+}
+
+// 帯域ごとにスロットをまとめる（帯域の順序・ラベルはサーバー設定に従う）
+const bandGroups = computed(() => {
+  if (!bands.value.length) {
+    return [{ key: 'all', label: '全周波数', min: 76, max: 88.9, dedicated: false, description: '', slots: slots.value }]
+  }
+  return bands.value.map((b) => ({
+    ...b,
+    slots: slots.value.filter(
+      (s) => s.band === b.key && s.frequency >= b.min - 1e-6 && s.frequency <= b.max + 1e-6
+    ),
+  }))
+})
+
+const dedicatedBand = computed(() => bands.value.find((b) => b.dedicated) || null)
+const dedicatedRangeText = computed(() => rangeText(dedicatedBand.value, '76.0〜79.9MHz'))
+const freeRangeText = computed(() => {
+  const free = bands.value.filter((b) => !b.dedicated)
+  if (!free.length) return '（なし）'
+  return free.map((b) => `${b.min.toFixed(1)}〜${b.max.toFixed(1)}MHz`).join(' と ')
+})
+
+function rangeText(band, fallback) {
+  if (!band) return fallback
+  return `${band.min.toFixed(1)}〜${band.max.toFixed(1)}MHz`
+}
+
+function minutesText(minutes) {
+  if (minutes >= 60 && minutes % 60 === 0) return `${minutes / 60}時間`
+  return `${minutes}分`
+}
+
+// 切り忘れ対策（自動停波）の説明文
+const autoOffText = computed(() => {
+  const cfg = autoOff.value
+  if (!cfg) return ''
+  const parts = []
+  if (cfg.idle_minutes > 0) parts.push(`無人（リスナー0人）のまま${minutesText(cfg.idle_minutes)}`)
+  if (cfg.after_minutes > 0) parts.push(`ON AIR から${minutesText(cfg.after_minutes)}`)
+  if (!parts.length) return ''
+  return `切り忘れ対策: ${parts.join('、または ')}経過した局は自動で停波します（専用局・自動DJ局・番組枠は対象外）`
+})
 
 // 自分の局判定: auth.user が未取得でも /stations/mine から判定できるようにする
 const isMine = computed(
@@ -189,8 +279,21 @@ async function load() {
     const res = await api('/frequencies')
     slots.value = res.slots || []
     Object.assign(counts, res.counts || {})
+    bands.value = res.bands || []
+    autoOff.value = res.auto_off || null
   } catch (e) {
     console.error(e)
+  }
+}
+
+// 専用局帯の空きスロットから専用局の申請フォームへ誘導する
+async function applyDedicated() {
+  if (!selected.value) return
+  prefillFrequency.value = selected.value.frequency
+  selected.value = null
+  await nextTick()
+  if (dedicatedBlock.value) {
+    dedicatedBlock.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 }
 
@@ -358,6 +461,14 @@ onBeforeUnmount(() => {
   color: var(--green);
   line-height: 1.6;
 }
+.fmap__note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  border-left: 2px solid var(--line-strong);
+  padding-left: 8px;
+}
 
 /* ===== 凡例 ===== */
 .fmap__legend {
@@ -422,12 +533,53 @@ onBeforeUnmount(() => {
   border-style: dashed;
 }
 
+/* ===== 帯域ブロック（専用局帯 / 自由な周波数） ===== */
+.band {
+  margin-bottom: 22px;
+}
+.band__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--line-strong);
+}
+.band__label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text);
+}
+.band__label.is-dedicated {
+  color: var(--green);
+}
+.band__range {
+  font-size: 12px;
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+}
+.band__count {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.band__desc {
+  flex: 1;
+  min-width: 200px;
+  font-size: 11px;
+  color: var(--faint);
+  text-align: right;
+}
+
 /* ===== スロットグリッド ===== */
 .fmap__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
   gap: 5px;
-  margin-bottom: 28px;
+  margin-bottom: 0;
 }
 .slot {
   font-family: inherit;

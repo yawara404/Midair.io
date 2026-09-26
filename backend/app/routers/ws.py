@@ -15,9 +15,15 @@ from app.core.database import async_session_factory
 from app.core.security import decode_token
 from app.core.utils import parse_youtube_id
 from app.models.models import Message, Station, User
-from app.services.ai_dj import generate_dj_line
+from app.services.ai_dj import dj_should_reply, generate_dj_line
 from app.services.discord_sync import send_to_discord
-from app.services.sessions import current_offset, record_track
+from app.services.dj_announce import schedule_track_change
+from app.services.sessions import (
+    current_offset,
+    current_track,
+    dj_track_context,
+    record_track,
+)
 from app.services.websocket_manager import manager
 
 router = APIRouter()
@@ -112,7 +118,7 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
         station_name = station.callsign
         ai_dj_prompt = station.ai_dj_prompt
         ai_dj_enabled = bool(station.ai_dj_enabled)
-        current_track = {
+        welcome_track = {
             "youtube_video_id": station.current_youtube_id,
             "playback_started_at": (
                 station.playback_started_at.isoformat()
@@ -137,7 +143,7 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
                 "is_broadcaster": is_broadcaster,
                 "station_id": station_id,
                 "station_name": station_name,
-                "track": current_track,
+                "track": welcome_track,
             }
         )
 
@@ -185,52 +191,61 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
                         pass
 
                 # LLMで自由思考の返信（Mia局は「Mia」、その他のAI局は「DJ」として）
-                try:
-                    from app.services.ai_dj import maybe_chat_reply
+                # DJは「DJさん」「hey DJ」と呼びかけられたときだけ返事する（Mia局は常時）
+                if dj_should_reply(station_name, content):
+                    try:
+                        from app.services.ai_dj import maybe_chat_reply
 
-                    context = ""
-                    async with async_session_factory() as cs:
-                        rows = (
-                            await cs.execute(
-                                select(Message)
-                                .where(Message.station_id == station_id)
-                                .order_by(Message.id.desc())
-                                .limit(6)
+                        context = ""
+                        track_label = None
+                        async with async_session_factory() as cs:
+                            rows = (
+                                await cs.execute(
+                                    select(Message)
+                                    .where(Message.station_id == station_id)
+                                    .order_by(Message.id.desc())
+                                    .limit(6)
+                                )
+                            ).scalars().all()
+                            context = "\n".join(
+                                f"{m.sender_name}: {m.content}" for m in reversed(rows)
                             )
-                        ).scalars().all()
-                        context = "\n".join(
-                            f"{m.sender_name}: {m.content}" for m in reversed(rows)
+                            # 今流れている曲を踏まえて返信させる
+                            if settings.dj_track_comment_enabled:
+                                st = await cs.get(Station, station_id)
+                                if st is not None:
+                                    track_label = (await current_track(cs, st)).get("title")
+                        reply = await maybe_chat_reply(
+                            station_id,
+                            station_name,
+                            ai_dj_prompt,
+                            ai_dj_enabled,
+                            content,
+                            context=context,
+                            track=track_label,
                         )
-                    reply = await maybe_chat_reply(
-                        station_id,
-                        station_name,
-                        ai_dj_prompt,
-                        ai_dj_enabled,
-                        content,
-                        context=context,
-                    )
-                    if reply:
-                        sender = "Mia" if is_relay_station else "DJ"
-                        bot_payload = await _persist_message(
-                            station_id, sender, reply, is_dj=True
-                        )
-                        await manager.broadcast(
-                            station_id, {"type": "message", **bot_payload}
-                        )
-                        await send_to_discord(
-                            settings.discord_webhook_url, reply, f"[{station_name}] {sender}"
-                        )
-                        # Mia局は返信も Discord へミラーする（双方向）
-                        if is_relay_station:
-                            try:
-                                from app.services import discord_bot
+                        if reply:
+                            sender = "Mia" if is_relay_station else "DJ"
+                            bot_payload = await _persist_message(
+                                station_id, sender, reply, is_dj=True
+                            )
+                            await manager.broadcast(
+                                station_id, {"type": "message", **bot_payload}
+                            )
+                            await send_to_discord(
+                                settings.discord_webhook_url, reply, f"[{station_name}] {sender}"
+                            )
+                            # Mia局は返信も Discord へミラーする（双方向）
+                            if is_relay_station:
+                                try:
+                                    from app.services import discord_bot
 
-                                if discord_bot.is_configured():
-                                    await discord_bot.send_message(f"Mia: {reply}")
-                            except Exception:
-                                pass
-                except Exception:
-                    pass
+                                    if discord_bot.is_configured():
+                                        await discord_bot.send_message(f"Mia: {reply}")
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
 
             elif msg_type == "youtube_request":
                 raw = data.get("url") or data.get("video_id") or ""
@@ -256,6 +271,8 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
                     )
                     await manager.broadcast(station_id, {"type": "message", **payload})
                     await _broadcast_track(station_id, video_id, started_iso)
+                    # 曲が切り替わったらDJが曲紹介コメントを投稿する
+                    schedule_track_change(station_id, video_id)
                 else:
                     # リスナーはリクエストとして投げる（BGMは変わらない）
                     payload = await _persist_message(
@@ -267,7 +284,21 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
 
             elif msg_type == "dj_call":
                 context = (data.get("content") or "").strip()
-                line = await generate_dj_line(station_name, context, ai_dj_prompt)
+                # 今流れている曲（と直前の曲）を踏まえてDJに話させる
+                track_label = None
+                recent_label = None
+                if settings.dj_track_comment_enabled:
+                    async with async_session_factory() as cs:
+                        st = await cs.get(Station, station_id)
+                        if st is not None:
+                            track_label, recent_label = await dj_track_context(cs, st)
+                line = await generate_dj_line(
+                    station_name,
+                    context,
+                    ai_dj_prompt,
+                    track=track_label,
+                    recent=recent_label,
+                )
                 if line:
                     payload = await _persist_message(
                         station_id, "DJ", line, is_dj=True

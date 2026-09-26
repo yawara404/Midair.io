@@ -55,24 +55,94 @@
               <ul>
                 <li><b>ホーム</b>：周波数ダイヤルで局を選ぶ（±0.1は長押しで連続調整）</li>
                 <li><b>掲示板へ</b>：選んだ局のチャットに参加（匿名OK）</li>
-                <li><b>周波数マップ</b>：空きスロットの確認・開局・予約</li>
+                <li><b>周波数マップ</b>：空きスロットの確認・開局・予約・専用局の申請</li>
+              </ul>
+            </section>
+            <section class="help__sec">
+              <h4>周波数は2つのエリアに分かれています</h4>
+              <ul>
+                <li>
+                  <b>専用局帯（{{ dedicatedText }}）</b>：
+                  24時間常設の専用局の申請専用。一般の開局・時間枠予約はできません
+                </li>
+                <li>
+                  <b>自由な周波数（{{ freeText }}）</b>：
+                  誰でも自由に開局・時間枠予約できる一般エリア。専用局は作れません
+                </li>
+                <li>ダイヤルの位置は OSD に <b>DEDICATED AREA / FREE AREA</b> として表示されます</li>
+              </ul>
+            </section>
+            <section class="help__sec">
+              <h4>DJと話す</h4>
+              <ul>
+                <li>DJは「<b>DJさん</b>」「<b>hey DJ</b>」と呼びかけたときだけ返事します（大文字小文字・全角半角は問いません）</li>
+                <li>「<b>DJを呼ぶ</b>」ボタンでも呼べます</li>
+                <li>DJのコメントは<b>今流れている曲</b>に連動し、曲が切り替わると<b>曲紹介コメント</b>が流れます</li>
+                <li>AIチャットbotの「Miaちゃん」局（88.0MHz）は呼びかけなしでも返信します</li>
+              </ul>
+            </section>
+            <section class="help__sec">
+              <h4>DJ（パーソナリティ）の使い方</h4>
+              <ul>
+                <li>
+                  <b>開局</b>：「周波数を探す」→「＋ 開局する」で空き周波数（自由な周波数 {{ freeText }}）を選び、
+                  コールサイン・放送方針・AI DJキャラクターを設定します
+                </li>
+                <li>
+                  <b>スタジオ</b>：局の編集／BGM切替（YouTube URL）／ミュート／ON AIR・OFF AIR／廃局／番組表の追加
+                </li>
+                <li>
+                  <b>AI DJの設定</b>：スタジオの「AI DJ」チェックで有効・無効、キャラクター設定で口調や呼び方を指定
+                  （例: 落ち着いた低音の深夜DJ）。設定は返信・曲コメント・曲紹介に反映されます
+                </li>
+                <li>
+                  <b>呼びかけ必須</b>：リスナーが「DJさん」「hey DJ」と呼んだときだけ返事します
+                  （「DJを呼ぶ」ボタンも可）。無言の時間が続いたときはDJから話しかけます
+                </li>
+                <li>
+                  <b>曲に連動</b>：DJコメントは今流れている曲に触れ、BGMを切り替えると曲紹介コメントが自動で流れます
+                </li>
+                <li>
+                  <b>リクエスト</b>：リスナーは「♪ リクエスト」で曲を投げられます（BGMは変わりません）。
+                  流す曲はBGM切替・番組のBGM動画ID・専用局の音源プールで決まります
+                </li>
+                <li>
+                  <b>24時間流すには</b>：{{ autoOffText }}で自動停波するため、
+                  常設したい場合は専用局（{{ dedicatedText }}）を申請してください（専用局は自動停波の対象外）
+                </li>
+                <li>
+                  <b>おまかせで流す</b>：プリセット局「DJ BOT」（84.0MHz）／「Vocaloid BOT」（85.0MHz）が
+                  24時間ランダム選曲でオンエアしています（登録不要・そのまま聴けます）
+                </li>
+              </ul>
+            </section>
+            <section class="help__sec">
+              <h4>放送のルール</h4>
+              <ul>
+                <li>
+                  <b>切り忘れ対策</b>：{{ autoOffText }}で自動停波します
+                  （専用局・自動DJ局・番組枠は対象外）
+                </li>
+                <li>停波（OFF AIR）のスロットは砂嵐表示。周波数は廃局するまで確保されます</li>
+                <li>停波の前に放送内で予告が流れます</li>
               </ul>
             </section>
             <section class="help__sec">
               <h4>主な機能</h4>
               <ul>
-                <li><b>周波数を探す</b>：局の一覧。空き周波数で開局できます</li>
-                <li><b>番組表</b>：日別の番組予定（EPG）</li>
-                <li><b>スタジオ</b>：自分の局の編集・BGM・番組管理</li>
+                <li><b>周波数を探す</b>：局の一覧。空き周波数（自由な周波数）で開局できます</li>
+                <li><b>番組表</b>：日別の番組予定（EPG）。開始/終了で自動 ON AIR・停波</li>
+                <li><b>スタジオ</b>：自分の局の編集・BGM・AI DJ・番組管理</li>
                 <li><b>マイページ</b>：右上のユーザー名から。局管理・曲のログ</li>
-                <li><b>専用局</b>：周波数マップ内の申請フォームから（24時間常設）</li>
+                <li><b>専用局</b>：周波数マップ内の申請フォームから（専用局帯のみ・24時間常設）</li>
               </ul>
             </section>
             <section class="help__sec">
               <h4>権限について</h4>
               <ul>
                 <li>リスナー：チャット・リクエスト・専用局の申請</li>
-                <li>パーソナリティ：開局した局の運営</li>
+                <li>パーソナリティ：開局した局の運営（BGM切替・ON AIR/停波・モデレーション）</li>
+                <li>専用局マスター：承認された専用局の運営</li>
                 <li>管理者：専用局申請の審査（管理メニュー）</li>
               </ul>
             </section>
@@ -88,9 +158,10 @@
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from './stores/auth'
+import { api } from './api'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -98,6 +169,42 @@ const route = useRoute()
 const menuOpen = ref(false)
 // ヘルプメニュー開閉
 const helpOpen = ref(false)
+
+// ヘルプに載せる周波数帯・切り忘れ対策の設定（/api/bands から取得。失敗時は既定値を表示）
+const BANDS_FALLBACK = {
+  bands: [
+    { key: 'dedicated', dedicated: true, min: 76.0, max: 79.9 },
+    { key: 'free', dedicated: false, min: 80.0, max: 88.9 },
+  ],
+  auto_off: { after_minutes: 360, idle_minutes: 120, notice_minutes: 5 },
+}
+const bandInfo = ref(BANDS_FALLBACK)
+
+function rangeText(bands) {
+  if (!bands.length) return '—'
+  return bands.map((b) => `${b.min.toFixed(1)}〜${b.max.toFixed(1)}MHz`).join(' と ')
+}
+
+function minutesText(minutes) {
+  if (minutes >= 60 && minutes % 60 === 0) return `${minutes / 60}時間`
+  return `${minutes}分`
+}
+
+const dedicatedText = computed(() =>
+  rangeText(bandInfo.value.bands.filter((b) => b.dedicated))
+)
+const freeText = computed(() =>
+  rangeText(bandInfo.value.bands.filter((b) => !b.dedicated))
+)
+// 「ON AIR から6時間、または無人（リスナー0人）のまま2時間」形式
+const autoOffText = computed(() => {
+  const cfg = bandInfo.value.auto_off || {}
+  const parts = []
+  if (cfg.after_minutes > 0) parts.push(`ON AIR から${minutesText(cfg.after_minutes)}`)
+  if (cfg.idle_minutes > 0) parts.push(`無人（リスナー0人）のまま${minutesText(cfg.idle_minutes)}`)
+  if (!parts.length) return '放置された放送は停波しません（自動停波は無効）'
+  return parts.join('、または ')
+})
 
 // 遷移したら閉じる
 watch(
@@ -125,6 +232,18 @@ onMounted(async () => {
   await auth.hydrateFromUrl()
   // 保存済みトークンだけある状態でもユーザー情報を読み込む
   await auth.ensureUser()
+  // ヘルプに載せる帯域・切り忘れ対策の設定（失敗時は既定値のまま）
+  try {
+    const res = await api('/bands')
+    if (res && res.bands) {
+      bandInfo.value = {
+        bands: res.bands,
+        auto_off: res.auto_off || BANDS_FALLBACK.auto_off,
+      }
+    }
+  } catch (e) {
+    /* 既定値で表示する */
+  }
 })
 </script>
 
@@ -345,9 +464,11 @@ body {
   position: absolute;
   top: calc(100% + 10px);
   right: 0;
-  width: min(360px, calc(100vw - 24px));
+  width: min(420px, calc(100vw - 24px));
   max-height: 76vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   background: var(--panel);
   border: 1px solid var(--line-strong);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.7);

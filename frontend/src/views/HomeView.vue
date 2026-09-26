@@ -17,6 +17,7 @@
               <span class="tv__listeners">LISTENER {{ currentStation.listener_count || 0 }}</span>
               <span class="tv__dj">{{ currentStation.is_bot ? '🤖 AUTO DJ' : 'DJ ' + currentStation.owner_username }}</span>
             </div>
+            <div v-if="dialBand" class="tv__band">{{ dialBand }}</div>
           </div>
         </div>
 
@@ -109,6 +110,16 @@ const router = useRouter()
 const stations = ref([])
 const programs = ref([])
 const frequency = ref(80.0)
+// 周波数帯（専用局帯 / 自由な周波数）
+const bands = ref([])
+
+// ダイヤルの現在位置がどの帯域かを示す（エリア分けの可視化）
+const dialBand = computed(() => {
+  const f = frequency.value
+  const b = bands.value.find((x) => f >= x.min - 1e-6 && f <= x.max + 1e-6)
+  if (!b) return ''
+  return b.dedicated ? 'DEDICATED AREA / 専用局エリア' : 'FREE AREA / 自由な周波数'
+})
 
 const currentStation = computed(
   () => stations.value.find((s) => Math.abs(s.frequency - frequency.value) < 0.05) || null
@@ -214,7 +225,17 @@ async function load() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  // 帯域の区分（専用局帯 / 自由な周波数）は表示にしか使わないので失敗しても無視する
+  api('/bands')
+    .then((res) => {
+      bands.value = res.bands || []
+    })
+    .catch(() => {
+      bands.value = []
+    })
+})
 onBeforeUnmount(() => {
   stopStep()
 })
@@ -335,6 +356,15 @@ watch(
 .tv__live {
   color: var(--green);
   animation: blink 1.8s infinite;
+}
+.tv__band {
+  margin-top: 8px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--faint);
+  border-top: 1px dashed var(--line-strong);
+  padding-top: 6px;
+  max-width: 420px;
 }
 
 .tv__panel {

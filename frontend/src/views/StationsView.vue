@@ -3,7 +3,11 @@
     <div class="stations__head">
       <div>
         <h2>周波数を探す</h2>
-        <p>76.0〜88.9MHz の放送局。空いている周波数を取得して開局できます。</p>
+        <p>
+          76.0〜88.9MHz の放送局。自由な周波数（{{ freeRangeText }}）の空きを取得して開局できます。
+          <!-- 専用局帯は24時間常設の申請専用 -->
+          <router-link class="stations__link" to="/frequencies">周波数マップ</router-link>
+        </p>
       </div>
       <button class="btn btn--primary" @click="showCreate = !showCreate">
         {{ showCreate ? '閉じる' : '＋ 開局する' }}
@@ -13,7 +17,7 @@
     <form v-if="showCreate" class="create" @submit.prevent="createStation">
       <div class="create__grid">
         <label class="field">
-          <span>周波数（空き）</span>
+          <span>周波数（空き・{{ freeRangeText }}）</span>
           <select v-model="form.frequency">
             <option v-for="f in available" :key="f" :value="f">{{ f.toFixed(1) }} MHz</option>
           </select>
@@ -63,7 +67,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api'
 import { useAuthStore } from '../stores/auth'
@@ -72,15 +76,26 @@ const router = useRouter()
 const auth = useAuthStore()
 const stations = ref([])
 const available = ref([])
+// 開局できる帯域（自由な周波数）の情報
+const band = ref(null)
+const bands = ref([])
 const showCreate = ref(false)
 const createError = ref('')
 const form = reactive({ frequency: null, callsign: '', description: '', ai_dj_prompt: '' })
+
+const freeRangeText = computed(() => {
+  const free = bands.value.filter((b) => !b.dedicated)
+  if (!free.length) return band.value ? `${band.value.min.toFixed(1)}〜${band.value.max.toFixed(1)}MHz` : '80.0〜88.9MHz'
+  return free.map((b) => `${b.min.toFixed(1)}〜${b.max.toFixed(1)}MHz`).join(' と ')
+})
 
 async function load() {
   try {
     const [s, a] = await Promise.all([api('/stations'), api('/stations/available')])
     stations.value = s.stations || []
     available.value = a.available || []
+    band.value = a.band || null
+    bands.value = a.bands || []
     if (!form.frequency && available.value.length) form.frequency = available.value[0]
   } catch (e) {
     console.error(e)
@@ -120,6 +135,17 @@ onMounted(load)
   margin: 0;
   font-size: 12px;
   color: var(--text-dim);
+  line-height: 1.7;
+}
+.stations__link {
+  color: var(--green);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--line-strong);
+  margin-left: 6px;
+  white-space: nowrap;
+}
+.stations__link:hover {
+  border-bottom-color: var(--green);
 }
 .create {
   background: var(--panel);

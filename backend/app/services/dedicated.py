@@ -19,6 +19,7 @@ from app.models.models import (
     DedicatedTrackLibrary,
     Station,
 )
+from app.services.dj_announce import schedule_track_change
 from app.services.sessions import record_track
 from app.services.websocket_manager import manager
 
@@ -164,6 +165,8 @@ async def advance_station(db: AsyncSession, station: Station, now: Optional[date
             "listener_count": manager.channel_count(station.id),
         },
     )
+    # 曲が切り替わったらDJが曲紹介コメントを投稿する（今流れている曲に連動）
+    schedule_track_change(station.id, video_id, title)
     return True
 
 
