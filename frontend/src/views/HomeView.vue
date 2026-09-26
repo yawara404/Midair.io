@@ -97,6 +97,9 @@
         </div>
       </aside>
     </div>
+
+    <!-- フッター（プライバシーポリシー / 利用規約 / サイトマップ / 運営情報のモーダル） -->
+    <SiteFooter />
   </div>
 </template>
 
@@ -104,6 +107,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
+import SiteFooter from '../components/SiteFooter.vue'
 
 const route = useRoute()
 const router = useRouter()
