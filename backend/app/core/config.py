@@ -136,6 +136,12 @@ class Settings(BaseSettings):
     dj_bot_vocaloid_fresh_bias: float = 0.6
     # 「新曲」とみなす日数（この日数以内は上の倍率、3倍の日数以内は半分の倍率）
     dj_bot_vocaloid_fresh_days: int = 30
+    # 控えめに優先する名前（カンマ区切り。プロデューサー名・チャンネル名・曲名で判定する）
+    # ボカロP（例: higma）も歌声バンク（例: ナースロボ_タイプT）も指定できる。
+    # アンダースコアは半角（_）を正式とし、全角（＿）の表記ゆれも同じ扱いにする。
+    dj_bot_vocaloid_boost_names: str = "ナースロボ_タイプT,higma"
+    # その曲の重みを (1 + この値) 倍する（0=優先しない / 0.5=1.5倍）控えめな後押し
+    dj_bot_vocaloid_boost_bias: float = 0.5
 
     # 専用局（24時間常設）の自律運行エンジン
     dedicated_engine_enabled: bool = True

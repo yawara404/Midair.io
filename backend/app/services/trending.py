@@ -103,6 +103,16 @@ _VOCALOID_FALLBACK: list[tuple[str, str]] = [
     ("vnw8zURAxkU", "wowaka『ローリンガール』feat. 初音ミク"),
     ("7zwCIz-Ohn4", "DECO*27 - 乙女解剖 feat. 初音ミク"),
     ("poiZSEjQBgw", "【巡音ルカ GUMI】ハッピーシンセサイザ【オリジナル曲】"),
+    # 歌声バンク「ナースロボ_タイプT」の曲と、控えめに優先するボカロP「higma」の曲
+    # （いずれも videos.list で埋め込み可・長さ 90〜600 秒を確認済み）
+    ("dFNh-Ibxt-Y", "アヴァート / 初音ミク・ナースロボ_タイプT"),
+    ("RUzzgOat1xY", "【ナースロボ_タイプT】心象【オリジナル】"),
+    ("76gmJU5iasU", "お天使お姉さん / 初音ミク×ナースロボ_タイプT"),
+    ("w0zK9LtZC0Q", "higma - ムーンゲイザー feat. 初音ミク"),
+    ("KDaMHtlHAj8", "higma - ながいよる feat. 開発コードmiki"),
+    ("AXDiqn_E1do", "higma - レター feat. 初音ミク"),
+    ("jqlu-FGLayg", "higma - colorful feat.初音ミク"),
+    ("fiC_MdCm_qA", "higma - 話は続く feat. AI ナースロボ_タイプT"),
 ]
 
 # --- Vocaloid BOT の選曲テーマ ---
@@ -117,6 +127,10 @@ _VOCALOID_CHARACTERS = [
     "IA flower オリジナル曲",
     "重音テト 可不 星界 オリジナル曲",
     "結月ゆかり 歌愛ユキ オリジナル曲",
+    # 歌声合成音声（VOCALOID6 等）のボイスバンクも定番の歌声として扱う。
+    # 表記は半角アンダースコア（ナースロボ_タイプT）を正式とするが、
+    # タイトル側の全角（＿）も選曲判定では同じものとして扱う。
+    "ナースロボ_タイプT オリジナル曲",
 ]
 _VOCALOID_GENRES = [
     "ボカロ ロック オリジナル曲",
@@ -145,6 +159,8 @@ _VOCALOID_PRODUCERS = [
     "DECO*27", "ピノキオピー", "稲葉曇", "ハチ", "wowaka", "みきとP",
     "kemu", "Neru", "40mP", "ナユタン星人", "じん", "はるまきごはん",
     "一二三", "Kikuo", "ツミキ", "すりぃ", "syudou", "n-buna",
+    # 追加したボカロP（歌声ではなく制作側なのでこちらに入れる）
+    "higma",
 ]
 # 英字表記が定着しているPの別名（チャンネル名の照合に使う）
 _VOCALOID_PRODUCER_ALIASES: dict[str, tuple] = {
@@ -291,6 +307,10 @@ _VOICE_SYNTH_JP_MARKERS = (
     "東北ずん子", "東北きりたん", "ずんだもん", "四国めたん", "春日部つむぎ",
     "小春六花", "夏色花梨", "花隈千冬", "鳴花ヒメ", "鳴花ミコト",
     "メグッポイド", "蒼姫ラピス",
+    # VOCALOID6 等の歌声バンク（初音ミク等と同じ「歌う側」）。
+    # 正式表記は半角アンダースコア（ナースロボ_タイプT）。全角（＿）の表記ゆれも
+    # 拾えるよう「ナースロボ」で部分一致させる。
+    "ナースロボ",
     # エンジン・種別名
     "ボカロ", "ボーカロイド", "ボイスロイド", "歌声合成", "歌唱合成",
 )
@@ -316,8 +336,9 @@ _VOCALOID_MIN_SECONDS = _MIN_SONG_SECONDS
 _VOCALOID_MAX_SECONDS = 600
 
 # 判定用に取り除く記号・空白（日本語マーカー用）
+# アンダースコアは全角（＿）・半角（_）を同じものとして扱う
 _NAME_NOISE_RE = re.compile(
-    r"[\s\u3000\-_./|｜*＊+＋（）()【】\[\]「」『』:：;；!！?？、,，・&＆~〜]"
+    r"[\s\u3000\-_\uff3f./|｜*＊+＋（）()【】\[\]「」『』:：;；!！?？、,，・&＆~〜]"
 )
 # 英字マーカー用：記号を区切りにして単語へ分解する
 _WORD_SPLIT_RE = re.compile(r"[^0-9a-z\u3040-\u309f\u30a0-\u30ff\u4e00-\u9fff]+")
@@ -462,6 +483,58 @@ def _channel_matches(producer: str, channel: Optional[str]) -> bool:
     return False
 
 
+def _producer_key(name: Optional[str]) -> str:
+    """名前の比較用キー（小文字化・記号除去。全角/半角のアンダースコアも無視）。
+
+    正式表記は半角（ナースロボ_タイプT）だが、全角（ナースロボ＿タイプT）で
+    クレジットされている曲も同じものとして扱う。
+    """
+    return _normalize_text(name).replace("＿", "").replace("_", "")
+
+
+def _boosted_names() -> tuple:
+    """控えめに優先する名前（.env: DJ_BOT_VOCALOID_BOOST_NAMES）。
+
+    ボカロP（例: higma）と歌声バンク（例: ナースロボ_タイプT）のどちらも指定できる。
+    """
+    raw = settings.dj_bot_vocaloid_boost_names or ""
+    return tuple(name.strip() for name in raw.split(",") if name.strip())
+
+
+def _is_boosted(
+    producer: Optional[str] = None,
+    channel: Optional[str] = None,
+    title: Optional[str] = None,
+) -> bool:
+    """控えめに優先する名前の曲か。
+
+    プロデューサー名・チャンネル名・曲名のいずれかに含まれていれば対象にする
+    （歌声バンクは曲名側にクレジットされるため、曲名も見る）。
+    全角/半角のアンダースコアの違いは無視する。
+    """
+    boosted = _boosted_names()
+    if not boosted:
+        return False
+    targets = [
+        key
+        for key in (
+            _producer_key(producer),
+            _producer_key(channel),
+            _producer_key(title),
+        )
+        if key
+    ]
+    for name in boosted:
+        key = _producer_key(name)
+        # 短すぎる名前は誤って一致しやすいので無視する
+        if len(key) < 3:
+            continue
+        for target in targets:
+            if key == target or key in target:
+                return True
+    return False
+
+
 def _channel_is_trusted(channel: Optional[str], extra_producer: Optional[str] = None) -> bool:
     """ボカロの公式チャンネル・既知のボカロP本人のチャンネルかどうか。"""
     if _has_jp(_normalize_text(channel), _VOICE_SYNTH_JP_MARKERS) or _has_en(
@@ -584,6 +657,13 @@ def _filter_items(items: list[dict], theme: Optional[dict] = None) -> list[dict]
                 "synth_level": synth_level,
                 # 公開日時（新曲・急上昇を優先するために使う）
                 "published_at": snippet.get("publishedAt"),
+                # 控えめに優先する名前（既定: ナースロボ_タイプT / higma）の曲か
+                "boost": theme is not None
+                and _is_boosted(
+                    theme.get("producer"),
+                    snippet.get("channelTitle"),
+                    snippet.get("title"),
+                ),
             }
         )
     return out
@@ -843,6 +923,9 @@ def _popularity_weight(item: dict, source: str = "trending") -> float:
     if source == "vocaloid":
         if item.get("synth_level") == 2:
             weight *= 1.0 + max(0.0, float(settings.dj_bot_vocaloid_synth_bias))
+        # 控えめに優先する名前（既定: ナースロボ_タイプT / higma）の曲
+        if item.get("boost"):
+            weight *= 1.0 + max(0.0, float(settings.dj_bot_vocaloid_boost_bias))
         # 最新の急上昇を優先: 公開から fresh_days 以内は (1+bias) 倍、
         # その3倍の日数以内は半分のプラス
         fresh_days = max(0, int(settings.dj_bot_vocaloid_fresh_days))
