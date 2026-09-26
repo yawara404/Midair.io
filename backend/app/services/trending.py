@@ -1,4 +1,4 @@
-"""自動DJ局（DJ BOT / Vocaloid BOT）の選曲ソース。
+"""自動DJ局（DJ BOT / Vocaloid BOT / 管理者セレクト）の選曲ソース。
 
 - trending:  YouTube mostPopular（ミュージック）から人気曲を取得
 - search:    YouTube 検索（任意クエリ）から曲を取得
@@ -6,6 +6,8 @@
              歌声合成エンジン別の検索テーマを巡回し、候補を蓄積しながら選曲する。
              歌声合成のクレジットが確認できる曲（＝合成音声の歌唱）だけを流す
              （合成音声歌唱優先）。
+- playlist:  管理者が選んだ YouTube プレイリスト（dj_bot_playlist_id）の曲を
+             ランダムに流す。検索クォータを使わないので、クォータ超過中でも選曲できる。
 
 いずれも「埋め込み再生できる通常動画」だけを採用し、ランダムに1曲選ぶ。
 APIキー未設定・取得失敗時は埋め込み可能な内蔵プールにフォールバックする。
@@ -615,14 +617,20 @@ def _unfit_reason(item: dict, producer: Optional[str] = None) -> Optional[str]:
     return None
 
 
-def _filter_items(items: list[dict], theme: Optional[dict] = None) -> list[dict]:
+def _filter_items(
+    items: list[dict],
+    theme: Optional[dict] = None,
+    min_views: Optional[int] = None,
+) -> list[dict]:
     """埋め込み可能な通常動画だけを抽出する（Shorts は除外）。
 
     theme を渡すと Vocaloid BOT 用の判定（人の歌唱・別アーティスト等）も行い、
     歌声合成のクレジットの強さ（synth_level）を候補に付ける。
+    min_views を渡すと再生数の足切りを差し替える（管理者プレイリストは 0 にして
+    「管理人が選んだ曲は再生数に関係なく流す」ようにする）。
     """
     out = []
-    min_views = max(0, settings.dj_bot_min_views)
+    threshold = max(0, settings.dj_bot_min_views) if min_views is None else max(0, int(min_views))
     for item in items:
         video_id = item.get("id")
         snippet = item.get("snippet", {})
@@ -645,7 +653,7 @@ def _filter_items(items: list[dict], theme: Optional[dict] = None) -> list[dict]
             synth_level = _synth_credit_level(item)
         views = _view_count(item)
         # 再生数が少なすぎる動画（無人気の投稿）は選曲候補から外す
-        if views is not None and views <= min_views:
+        if views is not None and views <= threshold:
             continue
         out.append(
             {
@@ -671,7 +679,11 @@ def _filter_items(items: list[dict], theme: Optional[dict] = None) -> list[dict]
     return out
 
 
-async def _videos_by_ids(ids: list[str], theme: Optional[dict] = None) -> list[dict]:
+async def _videos_by_ids(
+    ids: list[str],
+    theme: Optional[dict] = None,
+    min_views: Optional[int] = None,
+) -> list[dict]:
     """動画IDから snippet/status/contentDetails を取得してフィルタする。"""
     ids = [i for i in ids if i]
     if not ids or not settings.youtube_api_key:
@@ -692,7 +704,7 @@ async def _videos_by_ids(ids: list[str], theme: Optional[dict] = None) -> list[d
             items = resp.json().get("items", [])
     except Exception:
         return []
-    return _filter_items(items, theme=theme)
+    return _filter_items(items, theme=theme, min_views=min_views)
 
 
 async def _fetch_trending() -> list[dict]:
@@ -764,6 +776,55 @@ async def _fetch_search(
     return await _videos_by_ids(ids, theme=theme)
 
 
+async def _fetch_playlist(playlist_id: Optional[str] = None) -> list[dict]:
+    """管理者が選んだ YouTube プレイリストの曲を取得する（playlistItems.list）。
+
+    search.list と違って検索クォータを消費しない（1回 = 1ユニット）ため、
+    検索クォータ超過中でも選曲できる。曲数はプレイリスト側の増減に追随する
+    （1回に読むページ数は dj_bot_playlist_pages）。管理人が選んだ曲なので
+    再生数の足切りはせず、埋め込み可否・Shorts 判定だけ行う。
+    """
+    pid = (playlist_id or settings.dj_bot_playlist_id or "").strip()
+    if not pid or not settings.youtube_api_key:
+        return []
+    ids: list[str] = []
+    token: Optional[str] = None
+    pages = max(1, int(settings.dj_bot_playlist_pages))
+    try:
+        async with httpx.AsyncClient() as client:
+            for _ in range(pages):
+                params = {
+                    "part": "contentDetails",
+                    "playlistId": pid,
+                    "maxResults": 50,
+                    "key": settings.youtube_api_key,
+                }
+                if token:
+                    params["pageToken"] = token
+                resp = await client.get(
+                    "https://www.googleapis.com/youtube/v3/playlistItems",
+                    params=params,
+                    timeout=10,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                ids.extend(
+                    item.get("contentDetails", {}).get("videoId")
+                    for item in data.get("items", [])
+                )
+                token = data.get("nextPageToken")
+                if not token:
+                    break
+    except Exception:
+        return []
+    # 同じ動画が複数回入っていても1曲として扱い、50件ずつ詳細を確認する
+    unique = list(dict.fromkeys(video_id for video_id in ids if video_id))
+    items: list[dict] = []
+    for start in range(0, len(unique), 50):
+        items.extend(await _videos_by_ids(unique[start : start + 50], min_views=0))
+    return items
+
+
 def _cache_key(source: str, query: Optional[str]) -> str:
     return f"{source}:{query or ''}"
 
@@ -826,6 +887,8 @@ def _cache_ttl_seconds(source: str) -> int:
     if source == "vocaloid":
         # 候補を溜めながら少しずつテーマを入れ替えるため、長めに保持する
         return max(30, settings.dj_bot_vocaloid_cache_minutes) * 60
+    # 管理者セレクト（playlist）も通常の選曲と同じ間隔で読み直す
+    # （プレイリストに曲を足した/消した分は、この間隔で選曲に反映される）
     return max(1, settings.dj_bot_trending_cache_minutes) * 60
 
 
@@ -874,12 +937,17 @@ async def pool(source: str = "trending", query: Optional[str] = None) -> list[di
             not item.get("fallback") for item in entry["items"]
         ):
             items = _merge_vocaloid_pool(entry["items"], items)
+    elif source == "playlist":
+        # 管理者セレクト: プレイリストの曲をそのまま候補にする
+        # （query にプレイリストIDを渡せば局ごとに差し替えられる）
+        items = await _fetch_playlist(query)
     else:
         items = await _fetch_search(query) if source == "search" else await _fetch_trending()
     if items:
         # 取得できた曲が少ないときは内蔵リストで補充する
         # （曲数が少ないと、同じ曲が近い間隔で再登場してしまう）
-        if len(items) < _MIN_POOL_FOR_ROTATION:
+        # ただし管理者セレクトは「そのプレイリストの曲だけ」を流す局なので補充しない
+        if source != "playlist" and len(items) < _MIN_POOL_FOR_ROTATION:
             items = _top_up_with_fallback(items, source)
         _cache[key] = {"at": now, "items": items}
         return items

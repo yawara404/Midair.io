@@ -4,7 +4,7 @@
       <div class="fmap__head-main">
         <h2>周波数マップ</h2>
         <p class="fmap__sub">
-          76.0〜88.9MHz ・ 全{{ slots.length }}スロット ・
+          76.0〜89.0MHz ・ 全{{ slots.length }}スロット ・
           <template v-for="(b, i) in bands" :key="b.key + b.min">
             <span v-if="i"> / </span>{{ b.min.toFixed(1) }}〜{{ b.max.toFixed(1) }}＝{{ bandShortLabel(b) }}
           </template>
@@ -203,7 +203,7 @@ function bandShortLabel(band) {
 // 帯域ごとにスロットをまとめる（帯域の順序・ラベルはサーバー設定に従う）
 const bandGroups = computed(() => {
   if (!bands.value.length) {
-    return [{ key: 'all', label: '全周波数', min: 76, max: 88.9, dedicated: false, description: '', slots: slots.value }]
+    return [{ key: 'all', label: '全周波数', min: 76, max: 89.0, dedicated: false, description: '', slots: slots.value }]
   }
   return bands.value.map((b) => ({
     ...b,

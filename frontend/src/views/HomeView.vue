@@ -46,7 +46,7 @@
                 class="tv__slider"
                 type="range"
                 min="76"
-                max="88.9"
+                max="89.0"
                 step="0.1"
                 :value="frequency"
                 @input="onSlider"
@@ -137,7 +137,7 @@ const today = computed(() => {
 })
 
 function changeFrequency(f) {
-  frequency.value = Math.min(88.9, Math.max(76, Math.round(f * 10) / 10))
+  frequency.value = Math.min(89.0, Math.max(76, Math.round(f * 10) / 10))
 }
 function nudge(d) {
   changeFrequency(frequency.value + d)
@@ -219,7 +219,7 @@ async function load() {
     programs.value = t.programs || []
     // ?freq=XX.X が指定されていればその周波数に合わせる（未開局でも可）
     const initFreq = parseFloat(route.query.freq)
-    if (Number.isFinite(initFreq) && initFreq >= 76 && initFreq <= 88.9) {
+    if (Number.isFinite(initFreq) && initFreq >= 76 && initFreq <= 89.0) {
       frequency.value = Math.round(initFreq * 10) / 10
     } else if (stations.value.length) {
       frequency.value = stations.value[0].frequency
@@ -249,7 +249,7 @@ watch(
   () => route.query.freq,
   (v) => {
     const f = parseFloat(v)
-    if (Number.isFinite(f) && f >= 76 && f <= 88.9) {
+    if (Number.isFinite(f) && f >= 76 && f <= 89.0) {
       frequency.value = Math.round(f * 10) / 10
     }
   }

@@ -4,7 +4,7 @@
       <div>
         <h2>周波数を探す</h2>
         <p>
-          76.0〜88.9MHz の放送局。自由な周波数（{{ freeRangeText }}）の空きを取得して開局できます。
+          76.0〜89.0MHz の放送局。自由な周波数（{{ freeRangeText }}）の空きを取得して開局できます。
           <!-- 専用局帯は24時間常設の申請専用 -->
           <router-link class="stations__link" to="/frequencies">周波数マップ</router-link>
         </p>
@@ -85,7 +85,7 @@ const form = reactive({ frequency: null, callsign: '', description: '', ai_dj_pr
 
 const freeRangeText = computed(() => {
   const free = bands.value.filter((b) => !b.dedicated)
-  if (!free.length) return band.value ? `${band.value.min.toFixed(1)}〜${band.value.max.toFixed(1)}MHz` : '80.0〜88.9MHz'
+  if (!free.length) return band.value ? `${band.value.min.toFixed(1)}〜${band.value.max.toFixed(1)}MHz` : '80.0〜89.0MHz'
   return free.map((b) => `${b.min.toFixed(1)}〜${b.max.toFixed(1)}MHz`).join(' と ')
 })
 

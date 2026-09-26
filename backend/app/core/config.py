@@ -113,6 +113,14 @@ class Settings(BaseSettings):
     # 人気曲の優先度（0=完全ランダム / 0.5=控えめに人気曲を優先 / 1.0=再生数に比例）
     dj_bot_popularity_power: float = 0.5
 
+    # --- 管理者セレクト（89.0MHz）---
+    # 管理者が選んだ YouTube プレイリストの曲をランダムに流す自動DJ局。
+    # playlistItems.list は検索クォータを消費しない（1回=1ユニット）ため、
+    # 検索クォータ超過中でも選曲できる。曲数はプレイリスト側の変更に追随する。
+    dj_bot_playlist_id: str = "PLI-z8IB_57vJxbuz8eQ9LrW_WSt1dzBju"
+    # 1回の取得で読むページ数（50曲/ページ。nextPageToken が無くなれば打ち切る）
+    dj_bot_playlist_pages: int = 10
+
     # --- Vocaloid BOT（85.0MHz）---
     # 歌声・ジャンル・年代・プロデューサー別の検索テーマを巡回して候補を蓄積する。
     # 1回のリフレッシュで引くテーマ数（ファミリーをまたいで選ぶ）
@@ -149,12 +157,12 @@ class Settings(BaseSettings):
 
     # 開局できる周波数レンジ（MHz）
     station_freq_min: float = 76.0
-    station_freq_max: float = 88.9
+    station_freq_max: float = 89.0
 
     # --- 周波数帯の区分（総スロット数は増やさない） ---
     # 専用局（24時間常設・申請承認制）を開設できる帯。
     # この帯の外は「自由な周波数」＝誰でも自由に開局・時間枠予約できる一般帯として扱う。
-    # （既定: 76.0〜79.9MHz＝専用局帯 / 80.0〜88.9MHz＝自由な周波数）
+    # （既定: 76.0〜79.9MHz＝専用局帯 / 80.0〜89.0MHz＝自由な周波数）
     dedicated_freq_min: float = 76.0
     dedicated_freq_max: float = 79.9
 

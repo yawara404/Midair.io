@@ -1,6 +1,6 @@
 """周波数管理・開局・予約・停波ライフサイクル API。
 
-76.0〜88.9MHz（0.1MHz刻み）の各スロット状態
+76.0〜89.0MHz（0.1MHz刻み）の各スロット状態
 （EMPTY / RESERVED / LIVE / OFF AIR）を管理する。
 """
 from datetime import datetime, timezone
@@ -48,7 +48,7 @@ def _now() -> datetime:
 
 
 def _all_frequencies() -> list[float]:
-    """76.0〜88.9MHz の全スロットを返す（総数は帯域分けで増減しない）。"""
+    """76.0〜89.0MHz の全スロットを返す（総数は帯域分けで増減しない）。"""
     return all_frequencies()
 
 

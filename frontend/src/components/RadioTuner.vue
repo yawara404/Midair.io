@@ -30,7 +30,7 @@
         class="tuner__slider"
         type="range"
         min="76"
-        max="88.9"
+        max="89.0"
         step="0.1"
         :value="currentFrequency"
         @input="onSlider"
@@ -93,8 +93,8 @@ const display = computed(() => (props.currentFrequency ?? 80).toFixed(1))
 const currentChannel = computed(
   () => props.channels.find((c) => Math.abs(c.frequency - props.currentFrequency) < 0.05) || null
 )
-// 76.0 → -135deg, 88.9 → +135deg
-const knobAngle = computed(() => ((props.currentFrequency - 76) / 12.9) * 270 - 135)
+// 76.0 → -135deg, 89.0 → +135deg
+const knobAngle = computed(() => ((props.currentFrequency - 76) / 13.0) * 270 - 135)
 
 // 直近で合わせた周波数（プロパティ更新は非同期なので自前で保持する）
 let lastFreq = props.currentFrequency
@@ -106,8 +106,8 @@ watch(
 )
 
 function emitFreq(f) {
-  // 開局可能なレンジ（76.0〜88.9MHz）を扱う
-  const clamped = Math.min(88.9, Math.max(76, Math.round(f * 10) / 10))
+  // 開局可能なレンジ（76.0〜89.0MHz）を扱う
+  const clamped = Math.min(89.0, Math.max(76, Math.round(f * 10) / 10))
   lastFreq = clamped
   emit('change-frequency', clamped)
 }

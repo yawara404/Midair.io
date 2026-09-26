@@ -1,4 +1,4 @@
-"""自動DJ局（DJ BOT / Vocaloid BOT）の選曲・再生ロジック。
+"""自動DJ局（DJ BOT / Vocaloid BOT / 管理者セレクト）の選曲・再生ロジック。
 
 - 曲が終わったら次の曲へ（曲の長さを基に判定）
 - 長すぎる曲は dj_bot_max_seconds（既定10分）で途中スキップ
@@ -23,12 +23,16 @@ from app.services.youtube import fetch_video_duration
 BOT_SOURCES: dict[str, dict] = {
     "DJ BOT": {"source": "trending", "query": None},
     "Vocaloid BOT": {"source": "vocaloid", "query": None},
+    # 管理者セレクト: 管理者が選んだプレイリストの曲をランダムに流す
+    # （query はプレイリストID。None なら settings.dj_bot_playlist_id を使う）
+    "管理者セレクト": {"source": "playlist", "query": None},
 }
 
 # 局名 -> 既定周波数（範囲外になった自動DJ局を範囲内へ移すのにも使う）
 BOT_FREQ_HINTS: dict[str, float] = {
     "DJ BOT": 84.0,
     "Vocaloid BOT": 85.0,
+    "管理者セレクト": 89.0,
 }
 
 

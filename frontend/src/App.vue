@@ -174,7 +174,7 @@ const helpOpen = ref(false)
 const BANDS_FALLBACK = {
   bands: [
     { key: 'dedicated', dedicated: true, min: 76.0, max: 79.9 },
-    { key: 'free', dedicated: false, min: 80.0, max: 88.9 },
+    { key: 'free', dedicated: false, min: 80.0, max: 89.0 },
   ],
   auto_off: { after_minutes: 360, idle_minutes: 120, notice_minutes: 5 },
 }
