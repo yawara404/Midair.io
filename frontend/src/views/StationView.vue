@@ -1,7 +1,17 @@
 <template>
   <div class="station-view">
     <div class="station-view__grid">
-      <div class="station-view__tuner">
+      <!-- チューナーは PC では常時表示。モバイル（幅1080px以下）のみ開閉式（既定は閉じた状態） -->
+      <div class="station-view__tuner" :class="{ 'is-collapsed': !tunerOpen }">
+        <button
+          class="station-view__tuner-toggle"
+          type="button"
+          :aria-expanded="tunerOpen ? 'true' : 'false'"
+          @click="tunerOpen = !tunerOpen"
+        >
+          <span>{{ tunerOpen ? '▲ チューナーを閉じる' : '▼ チューナーを開く' }}</span>
+          <span class="station-view__tuner-freq">{{ frequency.toFixed(1) }} MHz</span>
+        </button>
         <RadioTuner
           :channels="stations"
           :current-frequency="dialFrequency"
@@ -105,6 +115,8 @@ const track = ref({ videoId: null, startedAt: null })
 const latestTrack = ref(null)
 const trackReloadKey = ref(0)
 const favorited = ref(false)
+// モバイル（幅1080px以下）ではチューナーを折りたたんでチャットを最大化する（PCでは常時表示）
+const tunerOpen = ref(false)
 
 let socket = null
 
@@ -432,6 +444,10 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow-y: auto;
 }
+/* チューナー開閉トグル（モバイルのみ表示。PCでは常時表示なので隠す） */
+.station-view__tuner-toggle {
+  display: none;
+}
 /* ダイヤルが空き周波数を指しているときの案内（掲示板は切り替えない） */
 .station-view__hint {
   margin: 8px 0 0;
@@ -552,6 +568,33 @@ onBeforeUnmount(() => {
   }
   .station-view :deep(.tuner) {
     overflow: visible;
+  }
+
+  /* チューナー折りたたみトグル（モバイルのみ） */
+  .station-view__tuner-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    color: var(--green);
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+  }
+  .station-view__tuner-freq {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  /* 閉じているときはチューナー本体と空き周波数の案内を隠す */
+  .station-view__tuner.is-collapsed :deep(.tuner) {
+    display: none;
+  }
+  .station-view__tuner.is-collapsed .station-view__hint {
+    display: none;
   }
 }
 
