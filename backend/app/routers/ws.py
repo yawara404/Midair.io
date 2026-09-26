@@ -18,6 +18,7 @@ from app.models.models import Message, Station, User
 from app.services.ai_dj import dj_should_reply, generate_dj_line
 from app.services.discord_sync import send_to_discord
 from app.services.dj_announce import schedule_track_change
+from app.services.messages import persist_message as _persist_message
 from app.services.sessions import (
     current_offset,
     current_track,
@@ -31,49 +32,6 @@ router = APIRouter()
 
 def _now() -> datetime:
     return datetime.now()
-
-
-async def _persist_message(
-    station_id: int,
-    sender_name: str,
-    content: str,
-    user_id: Optional[int] = None,
-    is_dj: bool = False,
-    is_broadcaster: bool = False,
-    youtube_id: Optional[str] = None,
-) -> dict:
-    from app.services.threads import ensure_current_thread, register_post
-
-    async with async_session_factory() as session:
-        station = await session.get(Station, station_id)
-        # 2chライクなスレッドへ紐づけ（上限で自動アーカイブ＋新スレ）
-        thread = await ensure_current_thread(session, station) if station else None
-        # 放送セッションに自動バインド（offset = セッション開始からの経過秒）
-        session_id, offset = await current_offset(session, station_id)
-        msg = Message(
-            station_id=station_id,
-            session_id=session_id,
-            thread_id=thread.id if thread else None,
-            offset_seconds=offset,
-            user_id=user_id,
-            sender_name=sender_name,
-            content=content,
-            youtube_id=youtube_id,
-            is_dj=is_dj,
-            is_broadcaster=is_broadcaster,
-        )
-        session.add(msg)
-        rolled = await register_post(session, station, thread) if thread else None
-        await session.commit()
-        await session.refresh(msg)
-        payload = msg.to_dict()
-
-    if rolled is not None:
-        # 新スレに切り替わったことを全クライアントへ通知
-        await manager.broadcast(
-            station_id, {"type": "thread_update", "thread": rolled.to_dict()}
-        )
-    return payload
 
 
 async def _broadcast_track(

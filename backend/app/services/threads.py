@@ -82,16 +82,18 @@ async def ensure_all_stations(db: AsyncSession) -> None:
 
     スレッドが無い局には第1スレを作成し、既存メッセージ（thread_id 未設定）を
     そのスレッドへ割り当てて、過去ログとして閲覧できるようにする。
+    thread_id が未設定のまま残った投稿（旧DJ独り口など）も現在スレッドへ寄せる。
+    掲示板のチャット欄は現在スレッドの投稿しか表示しないため、紐づけが無いと
+    入り直したときに会話が消えてしまう。
     """
     from app.models.models import Message
 
     stations = (await db.execute(select(Station))).scalars().all()
     for st in stations:
         thread = await get_current_thread(db, st.id)
-        if thread is not None:
-            continue
-        thread = await create_thread(db, st)
-        # 既存の未割り当てメッセージをこのスレッドへ
+        if thread is None:
+            thread = await create_thread(db, st)
+        # スレッド未割り当ての投稿を現在スレッドへ寄せる（自己修復）
         msgs = (
             await db.execute(
                 select(Message).where(
@@ -101,5 +103,6 @@ async def ensure_all_stations(db: AsyncSession) -> None:
         ).scalars().all()
         for m in msgs:
             m.thread_id = thread.id
-        thread.post_count = len(msgs)
+        if msgs:
+            thread.post_count = (thread.post_count or 0) + len(msgs)
     await db.commit()

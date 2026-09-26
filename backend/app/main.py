@@ -12,7 +12,6 @@ from app.core.database import async_session_factory, init_db
 from app.core.security import hash_password
 from app.models.models import (
     BotStation,
-    Message,
     Program,
     Reservation,
     Station,
@@ -35,6 +34,7 @@ from app.services import discord_bot
 from app.services.ai_dj import generate_dj_line
 from app.services.auto_off import check_auto_off
 from app.services.bot_dj import play_limit_seconds, play_next
+from app.services.messages import persist_message
 from app.services.sessions import (
     clear_now_playing,
     close_session,
@@ -365,17 +365,8 @@ async def _dj_loop() -> None:
                 # LLM未設定・失敗時は何も投稿しない（定型文は使わない）
                 manager.touch(station_id)
                 continue
-            async with async_session_factory() as session:
-                msg = Message(
-                    station_id=station_id,
-                    sender_name="DJ",
-                    content=line,
-                    is_dj=True,
-                )
-                session.add(msg)
-                await session.commit()
-                await session.refresh(msg)
-                payload = msg.to_dict()
+            # スレッド紐づけは共通ヘルパーに任せる（付け忘れると掲示板ログから消える）
+            payload = await persist_message(station_id, "DJ", line, is_dj=True)
             await manager.broadcast(station_id, {"type": "message", **payload})
             manager.touch(station_id)
 
