@@ -6,27 +6,26 @@
     </div>
 
     <div class="player__box">
-      <div ref="playerEl" class="player__frame" :class="{ 'is-off': isOffAir }"></div>
-      <div v-if="isOffAir" class="player__static">
+      <div ref="playerEl" class="player__frame" :class="{ 'is-off': isStatic }"></div>
+      <!-- 再生できる曲が無いとき（停波 / 曲なし）は砂嵐にする -->
+      <div v-if="isStatic" class="player__static">
         <div class="player__noise"></div>
         <div class="player__scan"></div>
-        <span class="player__static-label">OFF AIR — 砂嵐</span>
-      </div>
-      <div v-else-if="!videoId" class="player__empty">
-        曲はまだリクエストされていません。
+        <span class="player__static-label">{{ staticLabel }}</span>
+        <span v-if="staticNote" class="player__static-note">{{ staticNote }}</span>
       </div>
     </div>
 
     <div class="player__meta">
       <span class="player__elapsed">{{ elapsed }}</span>
       <button
-        v-if="videoId && !playing && !isOffAir"
+        v-if="videoId && !playing && !isStatic"
         class="btn btn--ghost player__unmute"
         @click="resumeWithSound"
       >
         ▶ 音を出して再生
       </button>
-      <span class="player__sync" :class="{ 'is-on': !!videoId && !isOffAir }">SYNCED</span>
+      <span class="player__sync" :class="{ 'is-on': !isStatic }">SYNCED</span>
     </div>
   </div>
 </template>
@@ -43,7 +42,15 @@ const props = defineProps({
 })
 const emit = defineEmits(['player-error', 'ended'])
 
-const isOffAir = computed(() => props.status === 'off_air')
+// 再生できる曲が無いときは砂嵐（放送なし）にする。
+// status が live のまま「今オンエア中の曲」が無い局（AIチャットbot常駐局など）も砂嵐にする。
+const isStatic = computed(() => props.status === 'off_air' || !props.videoId)
+const staticLabel = computed(() =>
+  props.status === 'off_air' ? 'OFF AIR — 砂嵐' : 'NO MUSIC — 砂嵐'
+)
+const staticNote = computed(() =>
+  !props.videoId && props.status !== 'off_air' ? '曲はまだリクエストされていません。' : ''
+)
 
 const playerEl = ref(null)
 const elapsed = ref('00:00')
@@ -106,7 +113,7 @@ function createPlayer() {
 
 // 音を出して再生する（自動再生がブロックされた場合の再開も兼ねる）
 function resumeWithSound() {
-  if (!player || isOffAir.value) return
+  if (!player || isStatic.value) return
   try {
     player.unMute()
     player.setVolume(100)
@@ -118,7 +125,7 @@ function resumeWithSound() {
 
 // 最初のユーザー操作で、止まっていれば音あり再生を試みる
 function onFirstGesture() {
-  if (player && props.videoId && !playing.value && !isOffAir.value) resumeWithSound()
+  if (player && props.videoId && !playing.value && !isStatic.value) resumeWithSound()
 }
 
 function offsetSeconds() {
@@ -129,7 +136,7 @@ function offsetSeconds() {
 }
 
 function syncVideo() {
-  if (!player || !props.videoId || isOffAir.value) return
+  if (!player || !props.videoId || isStatic.value) return
   const data = player.getVideoData ? player.getVideoData() : null
   if (data && data.video_id === props.videoId) {
     player.seekTo(offsetSeconds(), true)
@@ -184,11 +191,11 @@ function stopPlayback() {
 }
 
 watch(
-  // 停波（砂嵐）になった瞬間にも止めたいので status も監視する
+  // 砂嵐になった瞬間にも止めたいので status も監視する（曲なしでも砂嵐にする）
   () => [props.videoId, props.status],
   ([v]) => {
     error.value = false
-    if (v && !isOffAir.value) {
+    if (v && !isStatic.value) {
       if (!ytReady) loadApi()
       else syncVideo()
       startTimer()
@@ -199,7 +206,7 @@ watch(
 )
 
 onMounted(() => {
-  if (props.videoId && !isOffAir.value) loadApi()
+  if (props.videoId && !isStatic.value) loadApi()
   // 自動再生ブロック対策: 最初のクリック/キー操作で音あり再生を再開
   window.addEventListener('pointerdown', onFirstGesture)
   window.addEventListener('keydown', onFirstGesture)
@@ -271,8 +278,10 @@ onBeforeUnmount(() => {
   background: #050505;
   overflow: hidden;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 8px;
 }
 .player__noise {
   position: absolute;
@@ -298,22 +307,20 @@ onBeforeUnmount(() => {
   font-size: 12px;
   letter-spacing: 2px;
 }
+/* 曲がまだ無い局（AIチャットbot常駐局など）の補足 */
+.player__static-note {
+  position: relative;
+  padding: 0 14px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--faint);
+  text-align: center;
+}
 @keyframes player-noise {
   0% { background-position: 0 0, 3px 3px; }
   33% { background-position: 1px 2px, 5px 1px; }
   66% { background-position: 2px 1px, 4px 4px; }
   100% { background-position: 0 0, 3px 3px; }
-}
-.player__empty {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: var(--text-dim);
-  text-align: center;
-  padding: 12px;
 }
 
 .player__meta {

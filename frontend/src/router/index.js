@@ -36,6 +36,13 @@ const router = createRouter({
     { path: '/dedicated', component: DedicatedView },
     { path: '/admin', component: AdminView },
     { path: '/preview', component: MidAirCard },
+    // サイト情報（フッターのモーダルと同じ内容）。
+    // ハッシュ（#privacy）ではなく通常のパスで開けるようにするため、
+    // 背景にホームを描画しつつ SiteFooter 側でモーダルを開く。
+    { path: '/about', component: HomeView },
+    { path: '/privacy', component: HomeView },
+    { path: '/terms', component: HomeView },
+    { path: '/sitemap', component: HomeView },
   ],
   // 履歴を行き来（back / forward）したときはスクロール位置を復元し、
   // 新規遷移では先頭へ戻す。
