@@ -76,7 +76,9 @@ class Settings(BaseSettings):
     # 曲の話題（印象・歌詞・聴きどころ）に触れさせる。
     dj_track_comment_enabled: bool = True
     # 曲が切り替わった瞬間にDJが曲紹介コメントを投稿する
-    dj_track_intro_enabled: bool = True
+    # （既定 off。DJは「独り口」（無言が続いたときのひとこと）で曲に連動します。
+    #   true にすると曲切替のたびに曲紹介も投稿します）
+    dj_track_intro_enabled: bool = False
     # 同じ局で曲紹介を連投しないための最小間隔（秒）
     dj_track_intro_cooldown_seconds: int = 10
     # 誰も聴いていない局では曲紹介をしない（LLM呼び出しの節約）
