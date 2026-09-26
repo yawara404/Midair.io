@@ -20,13 +20,13 @@
     <div class="player__meta">
       <span class="player__elapsed">{{ elapsed }}</span>
       <button
-        v-if="videoId && !playing"
+        v-if="videoId && !playing && !isOffAir"
         class="btn btn--ghost player__unmute"
         @click="resumeWithSound"
       >
         ▶ 音を出して再生
       </button>
-      <span class="player__sync" :class="{ 'is-on': !!videoId }">SYNCED</span>
+      <span class="player__sync" :class="{ 'is-on': !!videoId && !isOffAir }">SYNCED</span>
     </div>
   </div>
 </template>
@@ -106,7 +106,7 @@ function createPlayer() {
 
 // 音を出して再生する（自動再生がブロックされた場合の再開も兼ねる）
 function resumeWithSound() {
-  if (!player) return
+  if (!player || isOffAir.value) return
   try {
     player.unMute()
     player.setVolume(100)
@@ -118,7 +118,7 @@ function resumeWithSound() {
 
 // 最初のユーザー操作で、止まっていれば音あり再生を試みる
 function onFirstGesture() {
-  if (player && props.videoId && !playing.value) resumeWithSound()
+  if (player && props.videoId && !playing.value && !isOffAir.value) resumeWithSound()
 }
 
 function offsetSeconds() {
@@ -129,7 +129,7 @@ function offsetSeconds() {
 }
 
 function syncVideo() {
-  if (!player || !props.videoId) return
+  if (!player || !props.videoId || isOffAir.value) return
   const data = player.getVideoData ? player.getVideoData() : null
   if (data && data.video_id === props.videoId) {
     player.seekTo(offsetSeconds(), true)
@@ -168,28 +168,38 @@ function stopTimer() {
   }
 }
 
+// 停波（砂嵐）・曲なしのときは再生を止める
+// （iframe を隠すだけでは音が鳴り続けてしまうため、明示的に停止する）
+function stopPlayback() {
+  stopTimer()
+  elapsed.value = '00:00'
+  playing.value = false
+  if (!player) return
+  try {
+    player.stopVideo()
+  } catch (e) {}
+  try {
+    player.mute()
+  } catch (e) {}
+}
+
 watch(
-  () => props.videoId,
-  (v) => {
+  // 停波（砂嵐）になった瞬間にも止めたいので status も監視する
+  () => [props.videoId, props.status],
+  ([v]) => {
     error.value = false
-    if (v) {
+    if (v && !isOffAir.value) {
       if (!ytReady) loadApi()
       else syncVideo()
       startTimer()
     } else {
-      stopTimer()
-      elapsed.value = '00:00'
-      if (player) {
-        try {
-          player.stopVideo()
-        } catch (e) {}
-      }
+      stopPlayback()
     }
   }
 )
 
 onMounted(() => {
-  if (props.videoId) loadApi()
+  if (props.videoId && !isOffAir.value) loadApi()
   // 自動再生ブロック対策: 最初のクリック/キー操作で音あり再生を再開
   window.addEventListener('pointerdown', onFirstGesture)
   window.addEventListener('keydown', onFirstGesture)

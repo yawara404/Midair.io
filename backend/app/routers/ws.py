@@ -118,11 +118,13 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
         station_name = station.callsign
         ai_dj_prompt = station.ai_dj_prompt
         ai_dj_enabled = bool(station.ai_dj_enabled)
+        # 停波中（砂嵐）の局では曲を渡さない（古い曲が鳴り続けるのを防ぐ）
+        on_air = station.status != "off_air"
         welcome_track = {
-            "youtube_video_id": station.current_youtube_id,
+            "youtube_video_id": station.current_youtube_id if on_air else None,
             "playback_started_at": (
                 station.playback_started_at.isoformat()
-                if station.playback_started_at
+                if on_air and station.playback_started_at
                 else None
             ),
         }

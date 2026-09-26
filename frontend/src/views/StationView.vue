@@ -56,8 +56,8 @@
 
       <div class="station-view__side">
         <RadioPlayer
-          :video-id="track.videoId"
-          :started-at="track.startedAt"
+          :video-id="playerTrack.videoId"
+          :started-at="playerTrack.startedAt"
           :channel-name="currentStation ? currentStation.callsign : ''"
           :status="currentStation ? currentStation.status : ''"
           @player-error="onPlayerError"
@@ -108,6 +108,15 @@ let socket = null
 const currentStation = computed(
   () => stations.value.find((s) => Math.abs(s.frequency - frequency.value) < 0.05) || null
 )
+
+// 停波中（砂嵐）の局では曲を再生しない
+// （古い current_youtube_id が残っていても、砂嵐の裏で鳴り続けないようにする）
+const playerTrack = computed(() => {
+  if (currentStation.value && currentStation.value.status === 'off_air') {
+    return { videoId: null, startedAt: null }
+  }
+  return track.value
+})
 
 function wsUrl(stationId) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'

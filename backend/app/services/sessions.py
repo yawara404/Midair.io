@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import BroadcastSession, Message, SessionTrack, Station
+from app.services.websocket_manager import manager
 from app.services.youtube import fetch_youtube_title
 
 
@@ -65,6 +66,25 @@ async def close_session(
     await db.commit()
     await db.refresh(session)
     return session
+
+
+async def clear_now_playing(db: AsyncSession, station: Station) -> bool:
+    """「今オンエア中の曲」を消してリスナーへ通知する（消したら True）。
+
+    停波（OFF AIR）した局に最後の曲が残っていると、砂嵐の画面の裏でその曲の
+    音だけが流れ続けてしまう（iframe は隠しているだけで再生は止まらない）。
+    停波と同時に曲を消しておき、周波数を合わせたリスナーに砂嵐だけを見せる。
+    """
+    if station.current_youtube_id is None and station.playback_started_at is None:
+        return False
+    station.current_youtube_id = None
+    station.playback_started_at = None
+    await db.commit()
+    await manager.broadcast(
+        station.id,
+        {"type": "track_update", "youtube_video_id": None, "playback_started_at": None},
+    )
+    return True
 
 
 async def current_offset(

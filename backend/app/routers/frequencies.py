@@ -31,7 +31,7 @@ from app.models.models import (
     StationFavorite,
     User,
 )
-from app.services.sessions import close_session, open_session
+from app.services.sessions import clear_now_playing, close_session, open_session
 from app.services.websocket_manager import manager
 
 router = APIRouter(prefix="/api", tags=["frequencies"])
@@ -361,6 +361,8 @@ async def station_off_air(
     station.set_status("off_air")
     await db.commit()
     session = await close_session(db, station_id)
+    # 砂嵐の画面の裏で最後の曲が鳴り続けないよう、今オンエア中の曲も消す
+    await clear_now_playing(db, station)
     await broadcast_frequency_status(station.frequency, "off_air", station.id)
     await manager.broadcast(station_id, {"type": "live_update", "is_live": False, "status": "off_air"})
     return {"success": True, "status": "off_air", "session_id": session.id if session else None}

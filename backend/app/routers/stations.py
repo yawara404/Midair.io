@@ -30,7 +30,7 @@ from app.models.models import (
 from app.routers.frequencies import broadcast_frequency_status
 from app.services.bot_dj import play_next
 from app.services.dj_announce import schedule_track_change
-from app.services.sessions import close_session, open_session, record_track
+from app.services.sessions import clear_now_playing, close_session, open_session, record_track
 from app.services.websocket_manager import manager
 
 router = APIRouter(prefix="/api", tags=["stations"])
@@ -482,15 +482,9 @@ async def track_ended(
     ).scalars().first()
 
     # 曲をクリア（遅れて来たリスナーに同じ曲を再生させない）
-    station.current_youtube_id = None
-    station.playback_started_at = None
+    await clear_now_playing(db, station)
     if active_program is not None:
         # 番組枠の間は停波しない（曲だけクリアして放送は維持する）
-        await db.commit()
-        await manager.broadcast(
-            station_id,
-            {"type": "track_update", "youtube_video_id": None, "playback_started_at": None},
-        )
         return {"success": True, "action": "cleared"}
 
     # 通常局は停波（砂嵐）して放送セッションを閉じる
@@ -500,10 +494,6 @@ async def track_ended(
     await broadcast_frequency_status(station.frequency, "off_air", station.id)
     await manager.broadcast(
         station_id, {"type": "live_update", "is_live": False, "status": "off_air"}
-    )
-    await manager.broadcast(
-        station_id,
-        {"type": "track_update", "youtube_video_id": None, "playback_started_at": None},
     )
     await manager.broadcast(
         station_id,

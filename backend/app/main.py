@@ -36,6 +36,7 @@ from app.services.ai_dj import generate_dj_line
 from app.services.auto_off import check_auto_off
 from app.services.bot_dj import play_limit_seconds, play_next
 from app.services.sessions import (
+    clear_now_playing,
     close_session,
     dj_track_context,
     open_session,
@@ -94,6 +95,38 @@ _AI_CHAT_PRESETS = [
 ]
 
 
+async def _clear_stale_now_playing(session) -> int:
+    """停波（OFF AIR）のまま曲が残っている局を掃除する（起動時の点検）。
+
+    停波したのに最後の曲が残っていると、リスナーが周波数を合わせたときに
+    砂嵐の画面の裏でその曲が流れ続けてしまう。起動時に一度掃除しておく。
+    自動DJ局（常時オンエア）は対象外。
+    """
+    bot_ids = set(
+        (await session.execute(select(BotStation.station_id))).scalars().all()
+    )
+    stale = (
+        await session.execute(
+            select(Station).where(
+                Station.status == "off_air",
+                Station.is_dedicated.is_(False),
+                Station.current_youtube_id.isnot(None),
+            )
+        )
+    ).scalars().all()
+    cleared = 0
+    for station in stale:
+        if station.id in bot_ids:
+            continue
+        station.current_youtube_id = None
+        station.playback_started_at = None
+        cleared += 1
+    if cleared:
+        await session.commit()
+        print(f"[seed] 停波中の局に残っていた曲を消しました: {cleared}局")
+    return cleared
+
+
 async def _seed() -> None:
     """admin ユーザーと公式ステーションを初期投入する。"""
     async with async_session_factory() as session:
@@ -132,6 +165,8 @@ async def _seed() -> None:
         await _ensure_bot_stations(session, admin)
         # AIチャットbot常駐局（Miaちゃん）を用意する
         await _ensure_ai_chat_stations(session, admin)
+        # 停波したまま曲が残っている局を掃除する（砂嵐の裏で鳴り続けるのを防ぐ）
+        await _clear_stale_now_playing(session)
 
 
 async def _ensure_ai_chat_stations(session, admin: User) -> None:
@@ -367,6 +402,8 @@ async def _lifecycle_loop() -> None:
             ).scalars().all()
             for s in ended:
                 s.set_status("off_air")
+                # 予定終了の停波でも砂嵐の裏で曲が鳴り続けないよう曲を消す
+                await clear_now_playing(session, s)
                 await broadcast_frequency_status(s.frequency, "off_air", s.id)
 
             expired = (
@@ -441,6 +478,7 @@ async def _lifecycle_loop() -> None:
                 ):
                     st.set_status("off_air")
                     await close_session(session, st.id)
+                    await clear_now_playing(session, st)
                     await broadcast_frequency_status(st.frequency, "off_air", st.id)
 
             if started or ended or expired or program_changed:

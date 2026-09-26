@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.models import BotStation, Message, Program, Station
 from app.routers.frequencies import broadcast_frequency_status
-from app.services.sessions import close_session, get_open_session
+from app.services.sessions import clear_now_playing, close_session, get_open_session
 from app.services.websocket_manager import manager
 
 # 局ごとの告知済みセッション（同じ放送で二重に告知しない）
@@ -178,6 +178,8 @@ async def check_auto_off(db: AsyncSession) -> int:
         station.set_status("off_air")
         await close_session(db, station.id)
         await db.commit()
+        # 砂嵐の画面の裏で最後の曲が鳴り続けないよう、今オンエア中の曲も消す
+        await clear_now_playing(db, station)
         _notified.pop(station.id, None)
         await broadcast_frequency_status(station.frequency, "off_air", station.id)
         await manager.broadcast(
