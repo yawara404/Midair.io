@@ -21,9 +21,33 @@ import httpx
 from app.core.config import settings
 from app.services.youtube import parse_iso_duration
 
-# APIが使えないとき用の内蔵フォールバック（埋め込み再生できることを確認済みのID）
+# APIが使えないとき用の内蔵フォールバック（埋め込み再生できることを確認済みのID）。
+# ※ 少なすぎると同じ曲がすぐ再登場するので、ジャンルを散らして多めに持っておく
 _FALLBACK: list[tuple[str, str]] = [
     ("60ItHLz5WEA", "Alan Walker - Faded"),
+    ("JGwWNGJdvx8", "Ed Sheeran - Shape of You"),
+    ("fJ9rUzIMcZQ", "Queen - Bohemian Rhapsody"),
+    ("dQw4w9WgXcQ", "Rick Astley - Never Gonna Give You Up"),
+    ("s4UW__ysPEM", "Fujii Kaze - You"),
+    ("5ll40JRPoHM", "SEKAI NO OWARI「Supermarket」"),
+    ("FnjYuHgAKq4", "Mrs. GREEN APPLE - Feeling【LIVE】"),
+    ("tWez_36Zs6I", "ヨルシカ - LIVE「レプリカント」"),
+    ("Lufa9QAFFeY", "ROSÉ - new trick"),
+    ("K2quL_v3Lqc", "LEE JISOO - MISMATCH / THE FIRST TAKE"),
+    ("4J06I7qy7kM", "仲川瑠夏 - 朝にならないで / THE FIRST TAKE"),
+    ("otEgL_cdHdo", "稲葉浩志 / RIZAN"),
+    ("uzsSnLLHx5M", "BE:FIRST / WATCH ME feat. BIA"),
+    ("8rNve_w6XGw", "Hey! Say! JUMP - ハニカミ"),
+    ("DXzpRZpF12E", "Snow Man 'show time...'"),
+    ("0WzUWCS6-X0", "Snow Man '奇跡'"),
+    ("EH2rhQlvz7A", "Snow Man 'グッタイム'"),
+    ("JpIw7rSLRqc", "M!LK - 時空超えてユニバース"),
+    ("qjsOs4Kjr5Q", "坂道選抜「Audition」"),
+    ("Sp4xl7wtqtc", "櫻坂46『愛MUST BE』"),
+    ("Ky3mIUfBb5c", "INI｜'BEYOND THE SKY'"),
+    ("tdznAT137QI", "Aぇ! group「Emotion」"),
+    ("lYafXo-rjU8", "初星学園「め」"),
+    ("bpHBIO-Ridc", "【Kanaria×葛葉】アイデンティティ【セルフカバー】"),
     ("DeKLpgzh-qQ", "稲葉曇『ロストアンブレラ』Vo. 歌愛ユキ"),
     ("4xDzrJKXOOY", "lofi synthwave radio 🌌"),
 ]
@@ -31,18 +55,54 @@ _FALLBACK: list[tuple[str, str]] = [
 # Vocaloid BOT 用フォールバック（YouTube API が使えないときも1曲ループに
 # ならないよう、歌声・曲調の異なる曲を並べる。いずれも埋め込み再生を確認済み）
 _VOCALOID_FALLBACK: list[tuple[str, str]] = [
+    ("TXzfQ0cP1P0", "【初音ミク】恋愛裁判 Love Trial【オリジナルMV】"),
+    ("OuLZlZ18APQ", "【初音ミク】39みゅーじっく！【オリジナルMV】"),
+    ("9O2VyUM5MlQ", "まにまに / 初音ミク"),
     ("DeKLpgzh-qQ", "稲葉曇『ロストアンブレラ』Vo. 歌愛ユキ"),
-    ("KushW6zvazM", "DECO*27 - ゴーストルール feat. 初音ミク"),
     ("lw7pcm1W5tw", "ピノキオピー - ノンブレス・オブリージュ feat. 初音ミク"),
-    ("0HYm60Mjm0k", "カンザキイオリ - 命に嫌われている。/初音ミク"),
-    ("9O2VyUM5MlQ", "r-906 - まにまに / 初音ミク"),
-    ("jhl5afLEKdo", "ryo（supercell）- World is Mine / 初音ミク"),
-    ("TXzfQ0cP1P0", "40mP - 恋愛裁判 / 初音ミク"),
-    ("ZEy36W1xX8c", "はるまきごはん - メルティランドナイトメア feat.初音ミク"),
+    ("ZEy36W1xX8c", "メルティランドナイトメア / はるまきごはん feat.初音ミク"),
     ("AS4q9yaWJkI", "ハチ - 砂の惑星 feat.初音ミク"),
+    ("qtuX4cHk-vE", "マシュマリー / MIMI feat.初音ミク"),
+    ("jhl5afLEKdo", "World is Mine / ryo（supercell）feat. 初音ミク"),
+    ("0HYm60Mjm0k", "命に嫌われている。/初音ミク"),
+    ("KushW6zvazM", "DECO*27 - ゴーストルール feat. 初音ミク"),
+    ("vqiULULdvMA", "【鏡音リンレン】ぼうけんのしょがきえました！【オリジナルMV】"),
     ("CiEC329xPos", "ひとしずく×やま△ - 祝福のメシアとアイの塔"),
-    ("qtuX4cHk-vE", "MIMI - マシュマリー / feat.初音ミク"),
-    ("OuLZlZ18APQ", "39みゅーじっく！ / 初音ミク"),
+    ("V0m7gyCu5nM", "おまじない / 天使電影 feat.可不×裏命×星界"),
+    ("fHkRfcDILWI", "最後の夏にしよう / 重音テト・初音ミク・可不"),
+    ("uB_jQ8H2Yeg", "一千光年 / いよわ feat. 初音ミク、v_flower、歌愛ユキ、GUMI、可不、星界"),
+    ("FSLxRRQdNs4", "ただ病名が欲しかった / 可不・星界・カゼヒキ"),
+    ("LLjfal8jCYI", "オーバーライド - 重音テトSV[吉田夜世]"),
+    ("hXabKIYl_Yo", "星界ちゃんと可不ちゃんのおつかい合騒曲"),
+    ("xwqjhRwg7xc", "キティ / kitty - miku"),
+    ("P_CSdxSGfaA", "wowaka『アンノウン・マザーグース』feat. 初音ミク"),
+    ("tzaDeBNDp1c", "逢魔時の帰り方 / しとお Vo.狐子"),
+    ("PubukElqUJw", "異星にいこうね / いよわ feat.星界"),
+    ("lJB8ByV1nj4", "おどりゃんせ / YurryCanon feat.MIKU&GUMI"),
+    ("kbNdx0yqbZE", "DECO*27 - モニタリング feat. 初音ミク"),
+    ("7xht3kQO_TM", "『ハナタバ』/ MIMI feat. 可不"),
+    ("b2GJcYBoVyg", "神のまにまに / れるりり feat.ミク&リン&GUMI"),
+    ("TkroHwQYpFE", "【初音ミク】ヒビカセ【オリジナル】"),
+    ("8xFBLego17k", "【初音ミク】1925【オリジナル曲】"),
+    ("pLN6GK6_ILg", "【初音ミク】骸骨楽団とリリア【オリジナル曲】"),
+    ("bcLYdxMusHc", "TOKIO FUNKA / トキヲ・ファンカ - takamatt feat.GUMI"),
+    ("L0tcMxp8Iy8", "歌愛ユキ「いかないで」(remaster)"),
+    ("4MgXOeZWu2U", "「Butter-Fly～初音ミクVersion～」みきとP"),
+    ("Om3MTou2kPg", "【IA】六兆年と一夜物語【オリジナル曲・PV付】"),
+    ("Xg-qfsKN2_E", "みきとP『ロキ』MV"),
+    ("_FhgjDhBAWI", "【初音ミク】孤独毒毒【syudou】"),
+    ("PAwZl3Up-hc", "『はぐ』/ 初音ミク・可不"),
+    ("3em-J9yYPAo", "1000年生きてる / いよわ feat.初音ミク"),
+    ("jMKPYg0uhCI", "柊マグネタイト - マーシャル・マキシマイザー / 可不"),
+    ("ERo-sPa1a5g", "八王子P × Giga「Gimme×Gimme feat. 初音ミク・鏡音リン」"),
+    ("ZB75e7vzX0I", "wowaka『ワールズエンド・ダンスホール』feat. 初音ミク＆巡音ルカ"),
+    ("oidKy7khp8o", "初音ミクオリジナル曲「Calc.」"),
+    ("7Y9sJvLI3Po", "ジェヘナ(Gehenna) / wotaku feat. 初音ミク"),
+    ("YjOzaIXEoPA", "【初音ミク】ブラック★ロックシューター【オリジナル曲】"),
+    ("shs0rAiwsGQ", "千本桜 / WhiteFlame feat 初音ミク"),
+    ("vnw8zURAxkU", "wowaka『ローリンガール』feat. 初音ミク"),
+    ("7zwCIz-Ohn4", "DECO*27 - 乙女解剖 feat. 初音ミク"),
+    ("poiZSEjQBgw", "【巡音ルカ GUMI】ハッピーシンセサイザ【オリジナル曲】"),
 ]
 
 # --- Vocaloid BOT の選曲テーマ ---
@@ -172,6 +232,18 @@ def _fallback_items(source: str = "trending") -> list[dict]:
     return items
 
 
+# 選曲プールがこれより少ないときは、内蔵リストで補充する。
+# （曲数が少ないと、除外しきれずに同じ曲が近い間隔で再登場してしまう）
+_MIN_POOL_FOR_ROTATION = 30
+
+
+def _top_up_with_fallback(items: list[dict], source: str) -> list[dict]:
+    """取得できた候補が少ないとき、内蔵リスト（埋め込み確認済み）で補充する。"""
+    have = {item["youtube_id"] for item in items}
+    extra = [x for x in _fallback_items(source) if x["youtube_id"] not in have]
+    return items + extra
+
+
 def mark_failed(video_id: Optional[str]) -> None:
     """再生できなかった動画をブロックリストに追加する。"""
     if video_id:
@@ -260,6 +332,25 @@ _ASCII_JP_BOUNDARY_RE = re.compile(
 def _normalize_text(value: Optional[str]) -> str:
     """判定用に小文字化し、空白・記号を除去する。"""
     return _NAME_NOISE_RE.sub("", (value or "").lower())
+
+
+def _title_key(value: Optional[str]) -> str:
+    """曲名の比較用キー（小文字化して空白・記号を除去）。"""
+    return _normalize_text(value)
+
+
+def _same_title(a: str, b: str) -> bool:
+    """同じ曲名とみなすか（公式MV/remaster等の表記ゆれを許容する）。
+
+    短い方が長い方に含まれ、かつ十分な長さ（8文字以上）があるときだけ
+    「同じ曲」と判定する（「マシュマリー」のような短い曲名の誤判定を防ぐ）。
+    """
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    short, long = sorted((a, b), key=len)
+    return len(short) >= 8 and short in long
 
 
 def _word_text(value: Optional[str]) -> str:
@@ -704,6 +795,10 @@ async def pool(source: str = "trending", query: Optional[str] = None) -> list[di
     else:
         items = await _fetch_search(query) if source == "search" else await _fetch_trending()
     if items:
+        # 取得できた曲が少ないときは内蔵リストで補充する
+        # （曲数が少ないと、同じ曲が近い間隔で再登場してしまう）
+        if len(items) < _MIN_POOL_FOR_ROTATION:
+            items = _top_up_with_fallback(items, source)
         _cache[key] = {"at": now, "items": items}
         return items
     if entry and entry["items"]:
@@ -764,10 +859,16 @@ def _popularity_weight(item: dict, source: str = "trending") -> float:
 async def random_track(
     exclude_id: Optional[str] = None,
     exclude_ids: Optional[list[str]] = None,
+    exclude_titles: Optional[list[str]] = None,
     source: str = "trending",
     query: Optional[str] = None,
 ) -> Optional[dict]:
-    """プールからランダムに1曲選ぶ（失敗済み・最近の曲を避ける）。"""
+    """プールからランダムに1曲選ぶ（失敗済み・最近の曲を避ける）。
+
+    exclude_ids: 直近に流した動画ID（新しい順）
+    exclude_titles: 直近に流した曲名（新しい順）。同じ曲の別動画（別投稿）が
+      続かないようにするために使う。
+    """
     items = await pool(source, query)
     if not items:
         return None
@@ -782,13 +883,40 @@ async def random_track(
         # （古い候補プールや内蔵プールが混ざっていても人の歌唱を流さない）
         credited = [x for x in candidates if (x.get("synth_level") or 0) > 0]
         candidates = credited or candidates
-    recent = {vid for vid in (exclude_ids or ()) if vid}
+
+    # 直近に流した曲（新しい順）。今オンエア中の曲を先頭に置く。
+    recent_ids: list[str] = [vid for vid in (exclude_ids or ()) if vid]
     if exclude_id:
-        recent.add(exclude_id)
-    choices = [x for x in candidates if x["youtube_id"] not in recent]
+        recent_ids.insert(0, exclude_id)
+    recent_id_set = set(recent_ids)
+    recent_title_keys = [
+        key for key in (_title_key(t) for t in (exclude_titles or ())) if key
+    ]
+
+    def _id_blocked(item: dict) -> bool:
+        return item["youtube_id"] in recent_id_set
+
+    def _title_blocked(item: dict) -> bool:
+        if not recent_title_keys:
+            return False
+        key = _title_key(item.get("title"))
+        return bool(key) and any(_same_title(key, r) for r in recent_title_keys)
+
+    choices = [x for x in candidates if not _id_blocked(x) and not _title_blocked(x)]
     if not choices:
-        # 直近の曲しか残っていないときは、せめて直前の1曲だけは避ける
-        choices = [x for x in candidates if x["youtube_id"] != exclude_id] or candidates
+        # プールが除外リストより小さいとき（＝内蔵フォールバックに落ちている等）は、
+        # 直近に流した順に多めに外し、最後に流れた方から優先して避ける。
+        # 全部を除外して「直前の1曲以外」から選ぶと、同じ曲がすぐ再登場して
+        # しまう（例: 12曲しかないのに30曲除外 → 恋愛裁判が30分後に再登場）。
+        keep = max(2, len(candidates) // 3)
+        block = max(0, len(candidates) - keep)
+        blocked_ids = set(recent_ids[:block])
+        id_ok = [x for x in candidates if x["youtube_id"] not in blocked_ids]
+        # 曲名が同じ（＝同じ曲の別動画）ものはさらに後回しにする
+        choices = [x for x in id_ok if not _title_blocked(x)] or id_ok
+        if not choices:
+            # それでも残らないときは、せめて直前の1曲だけは避ける
+            choices = [x for x in candidates if x["youtube_id"] != exclude_id] or candidates
     # 同じ投稿者（ボカロPなど）の曲が続かないように、直近の投稿者は後回しにする
     recent_channels = set(_recent_channels)
     preferred = [

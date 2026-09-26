@@ -67,32 +67,34 @@ async def play_limit_seconds(video_id: Optional[str]) -> int:
     return max(15, min(limit, settings.dj_bot_max_seconds))
 
 
-async def _recent_track_ids(
+async def _recent_tracks(
     db: AsyncSession, station_id: int, limit: int
-) -> list[str]:
-    """直近の選曲履歴から、重複回避に使う動画IDを集める。"""
+) -> list[tuple[str, Optional[str]]]:
+    """直近の選曲履歴から、重複回避に使う (動画ID, 曲名) を新しい順で集める。"""
     if limit <= 0:
         return []
     result = await db.execute(
-        select(SessionTrack.youtube_id)
+        select(SessionTrack.youtube_id, SessionTrack.title)
         .join(BroadcastSession, SessionTrack.session_id == BroadcastSession.id)
         .where(BroadcastSession.station_id == station_id)
         .order_by(SessionTrack.id.desc())
         .limit(limit)
     )
-    return [video_id for video_id in result.scalars() if video_id]
+    return [
+        (video_id, title) for video_id, title in result.all() if video_id
+    ]
 
 
 async def play_next(db: AsyncSession, station: Station) -> bool:
     """局に応じたソースから次の1曲を選んでオンエアする。"""
     src = resolve_source(station)
     # 直近に流した曲は避けて選曲する（同じ曲・同じ並びの繰り返しを防ぐ）
-    recent_ids = await _recent_track_ids(
-        db, station.id, settings.dj_bot_recent_exclude
-    )
+    # 曲名も渡して、同じ曲の別動画（別投稿）が続かないようにする
+    recent = await _recent_tracks(db, station.id, settings.dj_bot_recent_exclude)
     pick = await random_track(
         exclude_id=station.current_youtube_id,
-        exclude_ids=recent_ids,
+        exclude_ids=[video_id for video_id, _ in recent],
+        exclude_titles=[title for _, title in recent if title],
         source=src["source"],
         query=src["query"],
     )
