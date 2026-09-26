@@ -1,15 +1,7 @@
 <template>
   <div class="station-view">
     <div class="station-view__grid">
-      <div class="station-view__tuner" :class="{ 'is-collapsed': !tunerOpen }">
-        <button
-          class="station-view__tuner-toggle"
-          type="button"
-          @click="tunerOpen = !tunerOpen"
-        >
-          <span>{{ tunerOpen ? '▲ チューナーを閉じる' : '▼ チューナーを開く' }}</span>
-          <span class="station-view__tuner-freq">{{ frequency.toFixed(1) }} MHz</span>
-        </button>
+      <div class="station-view__tuner">
         <RadioTuner
           :channels="stations"
           :current-frequency="dialFrequency"
@@ -113,8 +105,6 @@ const track = ref({ videoId: null, startedAt: null })
 const latestTrack = ref(null)
 const trackReloadKey = ref(0)
 const favorited = ref(false)
-// モバイルではチューナーを折りたたんでチャットを最大化する
-const tunerOpen = ref(false)
 
 let socket = null
 
@@ -442,11 +432,6 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow-y: auto;
 }
-/* モバイル用チューナー折りたたみトグル（PCでは非表示） */
-.station-view__tuner-toggle {
-  display: none;
-}
-
 /* ダイヤルが空き周波数を指しているときの案内（掲示板は切り替えない） */
 .station-view__hint {
   margin: 8px 0 0;
@@ -567,29 +552,6 @@ onBeforeUnmount(() => {
   }
   .station-view :deep(.tuner) {
     overflow: visible;
-  }
-
-  /* チューナー折りたたみトグル（モバイルのみ） */
-  .station-view__tuner-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    padding: 10px 12px;
-    background: var(--panel);
-    border: 1px solid var(--line-strong);
-    color: var(--green);
-    font-family: inherit;
-    font-size: 13px;
-    letter-spacing: 0.04em;
-    cursor: pointer;
-  }
-  .station-view__tuner-freq {
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-  }
-  .station-view__tuner.is-collapsed :deep(.tuner) {
-    display: none;
   }
 }
 

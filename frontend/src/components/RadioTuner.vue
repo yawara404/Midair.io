@@ -235,11 +235,16 @@ function stopDrag() {
 .tuner {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   background: var(--panel);
   border: 1px solid var(--line-strong);
-  padding: 18px;
+  padding: 16px;
   border-radius: 0;
+}
+/* 高さが足りないときでも各パーツを潰さない
+   （flex の縮小で丸いダイヤルが楕円になるのを防ぐ。あふれた分はパネル内スクロール） */
+.tuner > * {
+  flex: 0 0 auto;
 }
 
 .tuner__meter {
@@ -249,7 +254,7 @@ function stopDrag() {
     linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
   background-size: 14px 14px;
   border: 1px solid var(--line-strong);
-  padding: 12px;
+  padding: 10px;
   text-align: center;
 }
 .tuner__label {
@@ -258,21 +263,24 @@ function stopDrag() {
   color: var(--text-dim);
 }
 .tuner__display {
-  font-size: 46px;
+  font-size: 32px;
+  line-height: 1.15;
   color: var(--green);
-  letter-spacing: 2px;
+  letter-spacing: 1px;
   font-variant-numeric: tabular-nums;
 }
 .tuner__unit {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-dim);
   letter-spacing: 2px;
 }
 
-/* ノブ：目盛りの刻み（conicグラデーション） */
+/* ノブ：目盛りの刻み（conicグラデーション）。常に正円を保つ */
 .knob {
+  flex: 0 0 auto;
   width: 120px;
   height: 120px;
+  aspect-ratio: 1 / 1;
   margin: 0 auto;
   border-radius: 50%;
   background:
