@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import require_user
 from app.models.models import BotStation, Station, User
-from app.services.bot_dj import play_next
+from app.services.bot_dj import play_next, resolve_source
 from app.services.trending import mark_failed
 
 router = APIRouter(prefix="/api/stations", tags=["bot"])
@@ -43,7 +43,7 @@ async def get_bot(station_id: int, db: AsyncSession = Depends(get_db)):
         "success": True,
         "is_bot": bot is not None,
         "interval_seconds": bot.interval_seconds if bot else settings.dj_bot_interval_seconds,
-        "source": "trending",
+        "source": resolve_source(station)["source"] if bot else None,
         "region": settings.dj_bot_region,
     }
 

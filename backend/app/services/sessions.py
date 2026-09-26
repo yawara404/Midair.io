@@ -80,21 +80,26 @@ async def current_offset(
 
 async def record_track(
     db: AsyncSession, station_id: int, youtube_id: str, title: Optional[str] = None
-) -> None:
-    """セッション中に流れた曲を、開始オフセット付きで記録する。"""
+) -> Optional[SessionTrack]:
+    """セッション中に流れた曲を、開始オフセット付きで記録して返す。
+
+    戻り値を WebSocket の track_update に載せると、リスナーの再生ログを
+    リロードなしで即時更新できる。
+    """
     session = await get_open_session(db, station_id)
     if session is None:
-        return
+        return None
     if title is None:
         # YOUTUBE_API_KEY があれば曲タイトルも取得して保存する
         title = await fetch_youtube_title(youtube_id)
     offset = max(0, int((_now() - session.started_at).total_seconds()))
-    db.add(
-        SessionTrack(
-            session_id=session.id,
-            youtube_id=youtube_id,
-            title=title,
-            started_offset_sec=offset,
-        )
+    track = SessionTrack(
+        session_id=session.id,
+        youtube_id=youtube_id,
+        title=title,
+        started_offset_sec=offset,
     )
+    db.add(track)
     await db.commit()
+    await db.refresh(track)
+    return track

@@ -63,7 +63,11 @@
           @player-error="onPlayerError"
           @ended="onPlayerEnded"
         />
-        <PlayLog :station-id="currentStation ? currentStation.id : null" />
+        <PlayLog
+          :station-id="currentStation ? currentStation.id : null"
+          :latest="latestTrack"
+          :reload-key="trackReloadKey"
+        />
       </div>
     </div>
   </div>
@@ -92,6 +96,9 @@ const handle = ref('')
 const connected = ref(false)
 const listenerCount = ref(0)
 const track = ref({ videoId: null, startedAt: null })
+// 再生ログ（PlayLog）をリアルタイム更新するための受け渡し
+const latestTrack = ref(null)
+const trackReloadKey = ref(0)
 const favorited = ref(false)
 // モバイルではチューナーを折りたたんでチャットを最大化する
 const tunerOpen = ref(false)
@@ -167,6 +174,12 @@ function handleEvent(data) {
       break
     case 'track_update':
       track.value = { videoId: data.youtube_video_id, startedAt: data.playback_started_at }
+      // 再生ログをリロードなしで更新（track が無いイベントは再取得で追随）
+      if (data.track) {
+        latestTrack.value = { ...data.track, _at: Date.now() }
+      } else {
+        trackReloadKey.value += 1
+      }
       break
     case 'live_update':
       if (currentStation.value) {

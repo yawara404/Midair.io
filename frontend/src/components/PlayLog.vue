@@ -27,10 +27,15 @@ import { api } from '../api'
 
 const props = defineProps({
   stationId: { type: [Number, String], default: null },
+  // WebSocket の track_update で届いた最新曲（あればリロードなしで先頭に差し込む）
+  latest: { type: Object, default: null },
+  // track が付かない更新（BGM切替・番組開始など）では再取得する
+  reloadKey: { type: Number, default: 0 },
 })
 
 const tracks = ref([])
 const open = ref(false)
+const MAX_TRACKS = 30
 
 function pad(n) {
   return String(n).padStart(2, '0')
@@ -48,13 +53,34 @@ async function load() {
     return
   }
   try {
-    const res = await api(`/stations/${props.stationId}/tracks?limit=30`)
+    const res = await api(`/stations/${props.stationId}/tracks?limit=${MAX_TRACKS}`)
     tracks.value = res.tracks || []
   } catch (e) {
     tracks.value = []
   }
 }
 
+// WebSocket で届いた曲を先頭に差し込む（同じIDは積み増さない）
+function prepend(track) {
+  if (!track || !track.youtube_id) return
+  const id = track.id
+  const rest = id ? tracks.value.filter((t) => t.id !== id) : tracks.value
+  if (!id && rest[0] && rest[0].youtube_id === track.youtube_id) return
+  tracks.value = [
+    {
+      id: id || `ws-${Date.now()}`,
+      youtube_id: track.youtube_id,
+      title: track.title,
+      played_at: track.played_at || new Date().toISOString(),
+    },
+    ...rest,
+  ].slice(0, MAX_TRACKS)
+}
+
+watch(() => props.latest, (t) => {
+  if (t) prepend(t)
+})
+watch(() => props.reloadKey, load)
 watch(() => props.stationId, load)
 onMounted(load)
 </script>

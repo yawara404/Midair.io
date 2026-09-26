@@ -65,7 +65,7 @@ class Settings(BaseSettings):
 
     # AI DJ の動作設定
     dj_enabled: bool = True
-    dj_idle_seconds: int = 45
+    dj_idle_seconds: int = 120
 
     # AIチャットbot（リスナーの発言に返信）のクールダウン秒数
     bot_reply_cooldown_seconds: int = 12
@@ -89,6 +89,21 @@ class Settings(BaseSettings):
     # 人気曲チャート（YouTube mostPopular / ミュージック）の地域とキャッシュ時間
     dj_bot_region: str = "JP"
     dj_bot_trending_cache_minutes: int = 30
+    # 直近何曲を重複回避するか（自動DJ局の全ソース共通）
+    dj_bot_recent_exclude: int = 30
+    # これ以下の再生数の動画は選曲しない（0 で無効）
+    dj_bot_min_views: int = 1000
+    # 人気曲の優先度（0=完全ランダム / 0.5=控えめに人気曲を優先 / 1.0=再生数に比例）
+    dj_bot_popularity_power: float = 0.5
+
+    # --- Vocaloid BOT（85.0MHz）---
+    # 歌声・ジャンル・年代・プロデューサー別の検索テーマを巡回して候補を蓄積する。
+    # 1回のリフレッシュで引くテーマ数（ファミリーをまたいで選ぶ）
+    dj_bot_vocaloid_themes_per_refresh: int = 3
+    # テーマを入れ替える間隔（分）。候補プールは保持されたまま少しずつ更新される。
+    dj_bot_vocaloid_cache_minutes: int = 90
+    # 蓄積する候補プールの上限（この中から直近の曲と重複しない曲をランダムに選ぶ）
+    dj_bot_vocaloid_pool_size: int = 400
 
     # 専用局（24時間常設）の自律運行エンジン
     dedicated_engine_enabled: bool = True

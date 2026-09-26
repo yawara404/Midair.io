@@ -143,8 +143,8 @@ async def advance_station(db: AsyncSession, station: Station, now: Optional[date
     station.set_status("live")
     await db.commit()
 
-    # 選曲ログに記録
-    await record_track(db, station.id, video_id, title=title)
+    # 選曲ログに記録（再生ログを即時更新できるよう WS にも載せる）
+    track = await record_track(db, station.id, video_id, title=title)
 
     # 3. リスナーへ即時同期
     await manager.broadcast(
@@ -153,6 +153,7 @@ async def advance_station(db: AsyncSession, station: Station, now: Optional[date
             "type": "track_update",
             "youtube_video_id": video_id,
             "playback_started_at": now.isoformat(),
+            "track": track.to_dict() if track else None,
         },
     )
     await manager.broadcast(

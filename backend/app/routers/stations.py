@@ -292,8 +292,8 @@ async def station_set_youtube(
     # 停波中から BGM で復帰した場合はセッションを開始する
     if not was_live:
         await open_session(db, station)
-    # 選曲ログに記録
-    await record_track(db, station_id, video_id)
+    # 選曲ログに記録（再生ログを即時更新できるよう WS にも載せる）
+    track = await record_track(db, station_id, video_id)
     started_iso = station.playback_started_at.isoformat()
     await manager.broadcast(
         station_id,
@@ -301,6 +301,7 @@ async def station_set_youtube(
             "type": "track_update",
             "youtube_video_id": video_id,
             "playback_started_at": started_iso,
+            "track": track.to_dict() if track else None,
         },
     )
     return {"success": True, "station": _with_listeners(station)}
