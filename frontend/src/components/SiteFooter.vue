@@ -65,7 +65,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 
 // 運営者情報（必要なら書き換えてください）
 const OPERATOR = {
@@ -257,16 +257,62 @@ const PAGES = {
 const current = ref(null)
 const year = new Date().getFullYear()
 
+// ハッシュでモーダルを直リンクできるようにする（Google 認証のポリシーURL用）
+//   例: /#privacy  /#terms  /#sitemap  /#about
+// ※ スタンドアロン版はハッシュをルーティングに使うため、そのときは URL を触らない
+const USE_HASH_LINK = !__STANDALONE__
+const HASH_ALIASES = {
+  privacy: 'privacy',
+  'privacy-policy': 'privacy',
+  policy: 'privacy',
+  terms: 'terms',
+  'terms-of-service': 'terms',
+  sitemap: 'sitemap',
+  'site-map': 'sitemap',
+  about: 'about',
+  info: 'about',
+}
+
+function keyFromHash() {
+  const raw = (window.location.hash || '').replace(/^#\/?/, '').trim().toLowerCase()
+  if (!raw) return null
+  const key = HASH_ALIASES[raw] || raw
+  return PAGES[key] ? key : null
+}
+
+// URL のハッシュをモーダルの状態に合わせる（履歴を1つ積むので「戻る」で閉じられる）
+function applyHash(key) {
+  if (!USE_HASH_LINK) return
+  if (key) {
+    if (window.location.hash === `#${key}`) return
+    window.history.pushState(null, '', `#${key}`)
+    return
+  }
+  if (!window.location.hash) return
+  window.history.pushState(null, '', window.location.pathname + window.location.search)
+}
+
 function open(key) {
-  current.value = PAGES[key] || null
+  const page = PAGES[key] || null
+  current.value = page
+  applyHash(page ? key : null)
 }
 
 function close() {
+  const had = Boolean(current.value)
   current.value = null
+  if (had) applyHash(null)
 }
 
 function onKeydown(e) {
   if (e.key === 'Escape') close()
+}
+
+// 直リンク（/#privacy など）やブラウザの戻る/進むに追従する
+function onHashChange() {
+  const key = keyFromHash()
+  if (key) current.value = PAGES[key]
+  else if (current.value) current.value = null
 }
 
 // モーダル表示中は Esc で閉じ、背面のスクロールを止める
@@ -280,9 +326,18 @@ watch(current, (page) => {
   }
 })
 
+onMounted(() => {
+  if (!USE_HASH_LINK) return
+  window.addEventListener('hashchange', onHashChange)
+  // ハッシュ付きで開かれた場合はそのモーダルを表示する
+  const key = keyFromHash()
+  if (key) current.value = PAGES[key]
+})
+
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown)
   document.body.style.overflow = ''
+  if (USE_HASH_LINK) window.removeEventListener('hashchange', onHashChange)
 })
 </script>
 
