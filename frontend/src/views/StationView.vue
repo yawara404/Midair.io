@@ -12,10 +12,19 @@
         </button>
         <RadioTuner
           :channels="stations"
-          :current-frequency="frequency"
+          :current-frequency="dialFrequency"
+          :tuned-frequency="frequency"
           :listener-count="listenerCount"
-          @change-frequency="changeFrequency"
+          show-commit
+          :can-commit="canCommit"
+          @change-frequency="onDial"
+          @commit="commitDial"
         />
+        <!-- ダイヤルが空き周波数を指しているときは、そのまま切り替えずに案内する -->
+        <p v-if="dialDiffers && !pendingStation" class="station-view__hint">
+          {{ dialFrequency.toFixed(1) }}MHz は空き周波数です（放送なし）。
+          <router-link to="/frequencies">周波数マップ</router-link> から開局できます。
+        </p>
       </div>
 
       <section class="station-view__stream">
@@ -75,7 +84,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import RadioTuner from '../components/RadioTuner.vue'
 import ChatStream from '../components/ChatStream.vue'
 import MessageInput from '../components/MessageInput.vue'
@@ -85,10 +94,14 @@ import { api, getToken, wsHost, wsPath } from '../api'
 import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 
 const stations = ref([])
+// 受信中の周波数（チャット・再生・スレッドが連動する）
 const frequency = ref(80.0)
+// チューナーのダイヤル位置（決定するまで局は切り替わらない）
+const dialFrequency = ref(80.0)
 const messages = ref([])
 const thread = ref(null)
 const maxPosts = ref(1000)
@@ -108,6 +121,14 @@ let socket = null
 const currentStation = computed(
   () => stations.value.find((s) => Math.abs(s.frequency - frequency.value) < 0.05) || null
 )
+
+// ダイヤルが指している局（決定する前のプレビュー）
+const pendingStation = computed(
+  () => stations.value.find((s) => Math.abs(s.frequency - dialFrequency.value) < 0.05) || null
+)
+// ダイヤルと受信中がずれているか（＝決定できる状態か）
+const dialDiffers = computed(() => Math.abs(dialFrequency.value - frequency.value) >= 0.05)
+const canCommit = computed(() => Boolean(pendingStation.value) && dialDiffers.value)
 
 // 停波中（砂嵐）の局では曲を再生しない
 // （古い current_youtube_id が残っていても、砂嵐の裏で鳴り続けないようにする）
@@ -233,25 +254,39 @@ async function loadStations() {
     if (!stations.value.length) return
     const routeId = Number(route.params.id)
     const target = stations.value.find((s) => s.id === routeId) || stations.value[0]
-    frequency.value = target.frequency
-    listenerCount.value = target.listener_count || 0
-    track.value = { videoId: target.current_youtube_id, startedAt: target.playback_started_at }
-    await loadThread(target.id)
-    connect(target.id)
-    await refreshFavorite()
+    tuneTo(target)
   } catch (e) {
     console.error(e)
   }
 }
 
-function changeFrequency(freq) {
-  frequency.value = Math.round(freq * 10) / 10
-  const s = currentStation.value
-  if (!s) return
-  listenerCount.value = s.listener_count || 0
-  track.value = { videoId: s.current_youtube_id, startedAt: s.playback_started_at }
-  loadThread(s.id)
-  connect(s.id)
+// チューナーのダイヤル操作。この時点では局を切り替えない（決定ボタンで切り替える）
+function onDial(freq) {
+  dialFrequency.value = Math.round(freq * 10) / 10
+}
+
+// ダイヤルで合わせた局に切り替える。
+// URL を更新（＝履歴に積む）してから切り替えるので、ブラウザの戻る/進むで局を行き来できる。
+function commitDial() {
+  const s = pendingStation.value
+  if (!s || !dialDiffers.value) return
+  if (Number(route.params.id) === s.id) {
+    // URL は既にこの局を指している（直接来た場合など）→ 受信だけ切り替える
+    tuneTo(s)
+    return
+  }
+  router.push(`/station/${s.id}`)
+}
+
+// 局に合わせる（決定時・履歴の移動時・初回表示時の共通処理）
+function tuneTo(station) {
+  if (!station) return
+  frequency.value = station.frequency
+  dialFrequency.value = station.frequency
+  listenerCount.value = station.listener_count || 0
+  track.value = { videoId: station.current_youtube_id, startedAt: station.playback_started_at }
+  loadThread(station.id)
+  connect(station.id)
   refreshFavorite()
 }
 
@@ -348,8 +383,9 @@ async function toggleFavorite() {
 watch(
   () => route.params.id,
   (id) => {
+    // チューナーの決定・ブラウザの戻る/進む・直リンクのいずれでもここを通る
     const s = stations.value.find((x) => x.id === Number(id))
-    if (s) changeFrequency(s.frequency)
+    if (s) tuneTo(s)
   }
 )
 
@@ -409,6 +445,18 @@ onBeforeUnmount(() => {
 /* モバイル用チューナー折りたたみトグル（PCでは非表示） */
 .station-view__tuner-toggle {
   display: none;
+}
+
+/* ダイヤルが空き周波数を指しているときの案内（掲示板は切り替えない） */
+.station-view__hint {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.station-view__hint a {
+  color: var(--green);
+  text-decoration: underline;
 }
 
 .now {

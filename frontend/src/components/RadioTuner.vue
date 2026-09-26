@@ -48,6 +48,20 @@
       >＋0.1</button>
     </div>
 
+    <!-- ダイヤルを合わせたあと、このボタンで受信を決定する（履歴にも残る） -->
+    <template v-if="showCommit">
+      <button
+        class="btn btn--primary tuner__commit"
+        type="button"
+        :disabled="!canCommit"
+        :title="canCommit ? 'この周波数に切り替える' : 'いま受信中の周波数です'"
+        @click="$emit('commit')"
+      >{{ commitLabel }}</button>
+      <p v-if="canCommit && tunedFrequency != null" class="tuner__pending">
+        受信中 {{ tunedFrequency.toFixed(1) }} MHz → {{ display }} MHz へ切り替え
+      </p>
+    </template>
+
     <div class="tuner__status">
       <span class="tuner__live">● ON AIR</span>
       <span class="tuner__listeners">LISTENER {{ listenerCount }}</span>
@@ -86,8 +100,14 @@ const props = defineProps({
   channels: { type: Array, default: () => [] },
   currentFrequency: { type: Number, default: 80.0 },
   listenerCount: { type: Number, default: 0 },
+  // ダイヤルは合わせただけでは切り替えず、決定ボタンで受信を切り替えるモード
+  showCommit: { type: Boolean, default: false },
+  canCommit: { type: Boolean, default: false },
+  // いま実際に受信している周波数（ダイヤルと違うときだけ「受信中」を表示する）
+  tunedFrequency: { type: Number, default: null },
+  commitLabel: { type: String, default: '▶ この周波数で受信' },
 })
-const emit = defineEmits(['change-frequency'])
+const emit = defineEmits(['change-frequency', 'commit'])
 
 const display = computed(() => (props.currentFrequency ?? 80).toFixed(1))
 const currentChannel = computed(
@@ -334,6 +354,19 @@ function stopDrag() {
   text-align: center;
   text-decoration: none;
   white-space: nowrap;
+}
+
+/* ダイヤルを合わせたあとの「決定」ボタン（履歴にも残る切り替え） */
+.tuner__commit {
+  width: 100%;
+  white-space: nowrap;
+}
+.tuner__pending {
+  margin: -4px 0 0;
+  font-size: 11px;
+  text-align: center;
+  color: var(--amber, var(--green));
+  letter-spacing: 0.04em;
 }
 
 .tuner__program {
