@@ -243,6 +243,8 @@ def _fallback_items(source: str = "trending") -> list[dict]:
                 "duration": None,
                 "fallback": True,
                 "synth_level": level,
+                # 内蔵リスト使用中（クォータ超過など）でも控えめな優先を効かせる
+                "boost": source == "vocaloid" and _is_boosted(title=title),
             }
         )
     return items
