@@ -331,8 +331,16 @@ async def station_set_live(
     if station.owner_id != user.id and user.role != "admin":
         raise HTTPException(status_code=403, detail="権限がありません")
     new_live = bool(data.get("is_live", station.status != "live"))
+    was_live = station.status == "live"
     station.set_status("live" if new_live else "off_air")
     await db.commit()
+    # 放送セッションを開始/終了する。
+    # セッションが無いまま ON AIR すると切り忘れ対策（auto_off）の基準時刻が
+    # 局の作成日時になり、ON AIR した直後に自動停波してしまう。
+    if new_live and not was_live:
+        await open_session(db, station)
+    elif not new_live and was_live:
+        await close_session(db, station_id)
     await broadcast_frequency_status(station.frequency, station.status, station.id)
     await manager.broadcast(
         station_id,
@@ -445,11 +453,11 @@ async def track_ended(
     - 自動DJ局（DJ BOT / Vocaloid BOT）: 次の曲へ（`/bot/ended` と同じ）
     - 専用局（24時間常設）: 何もしない（自律運行エンジンが次曲を送出する）
     - 番組枠の放送中: 曲だけクリアして `live` を維持（番組終了時刻はタイムテーブルに任せる）
-    - それ以外の通常局: 曲が尽きたら**停波（砂嵐）**にする
+    - それ以外の通常局: 曲だけクリアして **放送（ON AIR）は維持**（砂嵐＝待機中）
 
-    通常局は次曲を自動で選ばないため、そのままだと最後の曲が何度も再生され
-    砂嵐にならない（＝放送が終わらない）状態になる。ここで曲をクリアして
-    停波することで、次のリクエスト/BGM設定まで砂嵐になる。
+    通常局は次曲を自動で選ばないため、そのままだと最後の曲が何度も再生される。
+    ここで曲をクリアすることで、次のリクエスト/BGM設定まで砂嵐になる
+    （放送そのものは止めないので、ON AIR が勝手に「放送なし」にならない）。
     """
     station = await db.get(Station, station_id)
     if station is None:
@@ -487,23 +495,25 @@ async def track_ended(
         # 番組枠の間は停波しない（曲だけクリアして放送は維持する）
         return {"success": True, "action": "cleared"}
 
-    # 通常局は停波（砂嵐）して放送セッションを閉じる
-    station.set_status("off_air")
-    await db.commit()
-    await close_session(db, station_id)
-    await broadcast_frequency_status(station.frequency, "off_air", station.id)
-    await manager.broadcast(
-        station_id, {"type": "live_update", "is_live": False, "status": "off_air"}
-    )
-    await manager.broadcast(
-        station_id,
-        {
-            "type": "system",
-            "content": "📻 曲が終了しました。次の曲が設定されるまで砂嵐（OFF AIR）になります。",
-            "listener_count": manager.channel_count(station_id),
-        },
-    )
-    return {"success": True, "action": "off_air"}
+    # 通常局は放送（ON AIR）を続けたまま砂嵐（待機）にする。
+    # 曲をクリアするので最後の1曲がループすることはなく、次のリクエストが
+    # 入ればそのまま再生される（放送を終えるときはスタジオから OFF AIR する）。
+    if station.status == "live":
+        await manager.broadcast(
+            station_id, {"type": "live_update", "is_live": True, "status": "live"}
+        )
+        await manager.broadcast(
+            station_id,
+            {
+                "type": "system",
+                "content": (
+                    "📻 曲が終了しました。次の曲がリクエストされるまで"
+                    "砂嵐（待機中）です。"
+                ),
+                "listener_count": manager.channel_count(station_id),
+            },
+        )
+    return {"success": True, "action": "waiting"}
 
 
 # ---- エコシステム用プレビュー ----

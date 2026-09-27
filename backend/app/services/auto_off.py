@@ -135,13 +135,14 @@ async def check_auto_off(db: AsyncSession) -> int:
             continue
 
         session = await get_open_session(db, station.id)
+        # 放送の起点。セッション開始 > BGM開始 > 「今」を使う。
+        # 局の作成日時（created_at）を基準にすると、ON AIR 直後に
+        # 「長時間経過」「無人放置」と誤判定して即停波してしまう。
         started_at = (
             (session.started_at if session else None)
             or station.playback_started_at
-            or station.created_at
+            or now
         )
-        if started_at is None:
-            continue
 
         listeners = manager.channel_count(station.id)
         reasons: list[str] = []
