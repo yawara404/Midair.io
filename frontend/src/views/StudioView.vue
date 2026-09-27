@@ -21,6 +21,7 @@
         <span class="panel__freq">{{ s.frequency.toFixed(1) }} MHz</span>
         <span class="panel__name">{{ s.callsign }}</span>
         <span class="panel__live" :class="{ 'is-live': s.is_live }">{{ s.is_live ? '● ON AIR' : '○ OFF' }}</span>
+        <span v-if="s.always_on_air" class="panel__preset">常時ON AIR</span>
       </div>
 
       <div class="panel__controls">
@@ -33,7 +34,10 @@
           <input v-model="bgmUrl[s.id]" class="field-input" placeholder="YouTube URL / 動画ID" />
           <button class="btn btn--amber" @click="setBgm(s)">♪ BGM切替</button>
           <button class="btn btn--ghost" @click="mute(s)">ミュート</button>
-          <button v-if="s.status !== 'live'" class="btn btn--ghost" @click="setAir(s, 'on-air')">ON AIR</button>
+          <button v-if="s.always_on_air" class="btn btn--ghost" disabled title="常時ON AIRのプリセット局です">
+            常時ON AIR
+          </button>
+          <button v-else-if="s.status !== 'live'" class="btn btn--ghost" @click="setAir(s, 'on-air')">ON AIR</button>
           <button v-else class="btn btn--ghost" @click="setAir(s, 'off-air')">OFF AIR</button>
           <button class="btn btn--ghost" @click="closeStation(s)">廃局</button>
         </div>
@@ -303,6 +307,15 @@ onMounted(() => {
 .panel__live.is-live {
   color: var(--green);
   animation: blink 1.8s infinite;
+}
+/* 常時ON AIRのプリセット局バッジ */
+.panel__preset {
+  margin-left: 8px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--amber, var(--green));
+  border: 1px solid var(--line-strong);
+  padding: 1px 6px;
 }
 .panel__controls {
   padding: 14px 16px;

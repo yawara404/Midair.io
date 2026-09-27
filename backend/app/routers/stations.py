@@ -331,6 +331,11 @@ async def station_set_live(
     if station.owner_id != user.id and user.role != "admin":
         raise HTTPException(status_code=403, detail="権限がありません")
     new_live = bool(data.get("is_live", station.status != "live"))
+    if not new_live and station.always_on_air:
+        raise HTTPException(
+            status_code=400,
+            detail="この局は常時ON AIRのプリセット局です（停波できません）",
+        )
     was_live = station.status == "live"
     station.set_status("live" if new_live else "off_air")
     await db.commit()

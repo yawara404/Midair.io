@@ -14,7 +14,8 @@ from app.core.config import settings
 from app.core.database import async_session_factory
 from app.core.security import decode_token
 from app.core.utils import parse_youtube_id
-from app.models.models import Message, Station, User
+from app.models.models import BotStation, Message, Station, User
+from app.routers.frequencies import broadcast_frequency_status
 from app.services.ai_dj import dj_should_reply, generate_dj_line
 from app.services.discord_sync import send_to_discord
 from app.services.dj_announce import schedule_track_change
@@ -23,6 +24,7 @@ from app.services.sessions import (
     current_offset,
     current_track,
     dj_track_context,
+    open_session,
     record_track,
 )
 from app.services.websocket_manager import manager
@@ -221,21 +223,49 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
                     )
                     continue
                 if is_broadcaster:
-                    # 開局者はBGMを強制切り替え
+                    # 開局者（局のオーナー）または管理者はBGMを強制切り替えできる。
+                    # 停波中のプリセット局なら、放送も開始して曲をそのまま流す。
+                    # 自動DJ局（DJ BOT / Vocaloid BOT / 管理者セレクト）は常時 live なので
+                    # ここで放送開始になることはない（＝この対象に含まれない）。
                     async with async_session_factory() as session:
                         station = await session.get(Station, station_id)
+                        is_bot_station = (
+                            await session.get(BotStation, station_id)
+                        ) is not None
+                        was_live = station.status == "live"
                         station.current_youtube_id = video_id
                         station.playback_started_at = _now()
+                        station.set_status("live")
                         await session.commit()
+                        if not was_live and not is_bot_station:
+                            # 放送セッションを発行する（無いまま live にすると
+                            # 切り忘れ対策の基準時刻が局の作成日時になり即停波してしまう）
+                            await open_session(session, station)
                         # 選曲ログに記録
                         await record_track(session, station_id, video_id)
                         started_iso = station.playback_started_at.isoformat()
+                        station_freq = station.frequency
                     payload = await _persist_message(
                         station_id, handle, f"曲をオンエアしました: https://youtu.be/{video_id}",
                         user_id=user_id, is_broadcaster=True, youtube_id=video_id,
                     )
                     await manager.broadcast(station_id, {"type": "message", **payload})
                     await _broadcast_track(station_id, video_id, started_iso)
+                    if not was_live and not is_bot_station:
+                        # 停波中から放送を開始したことを全クライアントへ通知
+                        await broadcast_frequency_status(station_freq, "live", station_id)
+                        await manager.broadcast(
+                            station_id,
+                            {"type": "live_update", "is_live": True, "status": "live"},
+                        )
+                        await manager.broadcast(
+                            station_id,
+                            {
+                                "type": "system",
+                                "content": "📻 リクエストで放送を開始しました（ON AIR）。",
+                                "listener_count": manager.channel_count(station_id),
+                            },
+                        )
                     # 曲が切り替わったらDJが曲紹介コメントを投稿する
                     schedule_track_change(station_id, video_id)
                 else:

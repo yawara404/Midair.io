@@ -174,6 +174,25 @@ async def _seed() -> None:
         await _ensure_bot_stations(session, admin)
         # AIチャットbot常駐局（Miaちゃん）を用意する
         await _ensure_ai_chat_stations(session, admin)
+
+        # プリセット局（公式局）は常時 ON AIR にする（切り忘れ対策や OFF AIR で停波しない）
+        preset_names = (
+            [name for _freq, name, _desc in _SEED_STATIONS]
+            + [p["name"] for p in _AI_CHAT_PRESETS]
+            + [p["name"] for p in _BOT_PRESETS]
+        )
+        presets = (
+            await session.execute(
+                select(Station).where(Station.callsign.in_(preset_names))
+            )
+        ).scalars().all()
+        for st in presets:
+            st.always_on_air = True
+            if st.status != "live":
+                st.set_status("live")
+                await open_session(session, st)
+        await session.commit()
+
         # 停波したまま曲が残っている局を掃除する（砂嵐の裏で鳴り続けるのを防ぐ）
         await _clear_stale_now_playing(session)
 
@@ -481,7 +500,27 @@ async def _lifecycle_loop() -> None:
                     await clear_now_playing(session, st)
                     await broadcast_frequency_status(st.frequency, "off_air", st.id)
 
-            if started or ended or expired or program_changed:
+            # プリセット局（always_on_air）は常時 ON AIR を維持する
+            preset_changed = False
+            presets = (
+                await session.execute(
+                    select(Station).where(
+                        Station.always_on_air.is_(True), Station.status != "live"
+                    )
+                )
+            ).scalars().all()
+            for s in presets:
+                s.set_status("live")
+                # セッションが無いまま live にすると切り忘れ対策の基準時刻が
+                # 局の作成日時になり即停波してしまうため、必ず発行する
+                await open_session(session, s)
+                await broadcast_frequency_status(s.frequency, "live", s.id)
+                await manager.broadcast(
+                    s.id, {"type": "live_update", "is_live": True, "status": "live"}
+                )
+                preset_changed = True
+
+            if started or ended or expired or program_changed or preset_changed:
                 await session.commit()
 
             # 切り忘れ対策: ON AIR しっぱなしの局を自動停波する

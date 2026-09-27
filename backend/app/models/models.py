@@ -73,6 +73,8 @@ class Station(Base):
     is_dedicated: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     dedicated_genre: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     track_duration_sec: Mapped[int] = mapped_column(Integer, default=180)
+    # プリセット局（公式局）は常時 ON AIR。切り忘れ対策や OFF AIR 操作で停波しない
+    always_on_air: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
 
     owner: Mapped["User"] = relationship("User", lazy="selectin")
 
@@ -110,6 +112,7 @@ class Station(Base):
             "ai_dj_prompt": self.ai_dj_prompt,
             "is_dedicated": bool(self.is_dedicated),
             "dedicated_genre": self.dedicated_genre,
+            "always_on_air": bool(self.always_on_air),
             "track_duration_sec": self.track_duration_sec,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

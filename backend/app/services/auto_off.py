@@ -122,8 +122,9 @@ async def check_auto_off(db: AsyncSession) -> int:
     stopped = 0
 
     for station in stations:
-        # 常設局（専用局・自動DJ局）と外部連携局は放置されても停波しない
-        if station.is_dedicated or station.id in bot_ids:
+        # 常設局（専用局・自動DJ局・常時ON AIRのプリセット局）と外部連携局は
+        # 放置されても停波しない
+        if station.is_dedicated or station.always_on_air or station.id in bot_ids:
             continue
         if station.callsign == settings.discord_station_callsign:
             continue
