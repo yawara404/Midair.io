@@ -1,5 +1,9 @@
 <template>
   <div class="fmap">
+    <!-- 直前の画面に戻る（履歴が無ければホームへ） -->
+    <div class="page-nav">
+      <button class="btn btn--ghost" @click="goBack">← 戻る</button>
+    </div>
     <div class="fmap__head">
       <div class="fmap__head-main">
         <h2>周波数マップ</h2>
@@ -174,6 +178,13 @@ import DedicatedApplyForm from '../components/DedicatedApplyForm.vue'
 
 const route = useRoute()
 const router = useRouter()
+
+// 直前の画面に戻る（直リンクで来た場合はホームへ）
+function goBack() {
+  const state = window.history.state
+  if (state && state.back) router.back()
+  else router.push('/')
+}
 const auth = useAuthStore()
 
 // 専用局申請フォームからのログイン要求
@@ -427,6 +438,11 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* 戻るボタン（周波数ページ共通のナビ） */
+.page-nav {
+  margin-bottom: 10px;
+}
+
 /* ===== ヘッダー ===== */
 .fmap__head {
   display: flex;

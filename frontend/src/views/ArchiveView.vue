@@ -1,5 +1,9 @@
 <template>
   <div class="archive">
+    <!-- 直前の画面に戻る（履歴が無ければホームへ） -->
+    <div class="page-nav">
+      <button class="btn btn--ghost" @click="goBack">← 戻る</button>
+    </div>
     <div class="archive__head">
       <div>
         <h2>過去スレッド（アーカイブ）</h2>
@@ -62,10 +66,18 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 
 const route = useRoute()
+const router = useRouter()
+
+// 直前の画面に戻る（直リンクで来た場合はホームへ）
+function goBack() {
+  const state = window.history.state
+  if (state && state.back) router.back()
+  else router.push('/')
+}
 const threads = ref([])
 const maxPosts = ref(1000)
 const selectedStationId = ref(null)
@@ -132,6 +144,11 @@ watch(() => route.query.station, loadThreads)
 </script>
 
 <style scoped>
+/* 戻るボタン（周波数ページ共通のナビ） */
+.page-nav {
+  margin-bottom: 10px;
+}
+
 .archive__head {
   display: flex;
   justify-content: space-between;
