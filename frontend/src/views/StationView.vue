@@ -60,7 +60,7 @@
             class="thread-bar__djset"
             type="button"
             title="DJ設定（自動退出までの時間）"
-            @click="djSettingsOpen = true"
+            @click="openDjSettings"
           >🎙 DJ設定</button>
         </div>
 
@@ -70,7 +70,7 @@
           :broadcaster="isBroadcaster"
           @send="sendChat"
           @request-youtube="requestYoutube"
-          @call-dj="callDj"
+          @call-dj="openDjCall"
         />
       </section>
 
@@ -91,12 +91,16 @@
       </div>
     </div>
 
-    <!-- 開局者・管理者向け: DJ設定モーダル（自動退出までの時間） -->
-    <DjSettingsModal
-      :open="djSettingsOpen"
+    <!-- 「DJを呼ぶ」/ DJ設定 モーダル（呼び出し＋自動退出までの時間） -->
+    <DjModal
+      :open="djModalOpen"
+      :mode="djModalMode"
       :station="currentStation"
-      @close="djSettingsOpen = false"
+      :can-edit="isBroadcaster"
+      :initial-message="djCallText"
+      @close="djModalOpen = false"
       @saved="onDjSettingsSaved"
+      @call="onDjCall"
     />
   </div>
 </template>
@@ -109,7 +113,7 @@ import ChatStream from '../components/ChatStream.vue'
 import MessageInput from '../components/MessageInput.vue'
 import RadioPlayer from '../components/RadioPlayer.vue'
 import PlayLog from '../components/PlayLog.vue'
-import DjSettingsModal from '../components/DjSettingsModal.vue'
+import DjModal from '../components/DjModal.vue'
 import { api, getToken, wsHost, wsPath } from '../api'
 import { useAuthStore } from '../stores/auth'
 
@@ -135,8 +139,29 @@ const trackReloadKey = ref(0)
 const favorited = ref(false)
 // 局のオーナー・管理者かどうか（リクエストでBGMを切り替えられる権限）
 const isBroadcaster = ref(false)
-// DJ設定モーダル（自動退出までの時間）の開閉
-const djSettingsOpen = ref(false)
+// DJモーダル（DJを呼ぶ / DJ設定）の開閉と状態
+const djModalOpen = ref(false)
+const djModalMode = ref('call')
+const djCallText = ref('')
+
+// 「DJを呼ぶ」ボタン: モーダルを開く（チャット欄の入力を初期値にする）
+function openDjCall(text) {
+  djCallText.value = (text || '').trim()
+  djModalMode.value = 'call'
+  djModalOpen.value = true
+}
+
+// 🎙 DJ設定: 滞在時間だけを変更する
+function openDjSettings() {
+  djCallText.value = ''
+  djModalMode.value = 'settings'
+  djModalOpen.value = true
+}
+
+// モーダルの「DJを呼ぶ」→ WebSocket で dj_call を送る
+function onDjCall(message) {
+  callDj((message || '').trim())
+}
 
 // DJ設定を保存したら、その局の情報を最新にする
 function onDjSettingsSaved(station) {
