@@ -4,6 +4,7 @@
 送信者名にユーザー名が使われる。開局者は BGM 強制切り替え・モデレーション権限を持つ。
 """
 import random
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -31,6 +32,9 @@ from app.services.sessions import (
 from app.services.websocket_manager import manager
 
 router = APIRouter()
+
+# 同じ局で「DJを呼ぶ」を連打されたときの最終受付時刻（LLM呼び出しの乱用防止）
+_last_dj_call: dict[int, float] = {}
 
 
 def _now() -> datetime:
@@ -281,6 +285,12 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
                     await manager.broadcast(station_id, {"type": "message", **payload})
 
             elif msg_type == "dj_call":
+                # 連打は無視する（チャット返信と同じクールダウンで乱用防止）
+                now_ts = time.time()
+                cooldown = max(0, settings.bot_reply_cooldown_seconds)
+                if now_ts - _last_dj_call.get(station_id, 0.0) < cooldown:
+                    continue
+                _last_dj_call[station_id] = now_ts
                 # 「DJを呼ぶ」ボタン＝DJが滞在を開始（自動退出までの時間を延長）
                 mark_dj_called(station_id)
                 context = (data.get("content") or "").strip()

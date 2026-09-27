@@ -304,6 +304,22 @@ async def _ensure_bot_stations(session, admin: User) -> None:
             await session.commit()
 
 
+async def _supervise(name: str, loop_fn) -> None:
+    """バックグラウンドループを監視し、例外で死んでも再起動する。
+
+    （1回の例外でDJが黙り続ける、botの選曲が止まる等を防ぐ）
+    """
+    while True:
+        try:
+            await loop_fn()
+            return
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # noqa: BLE001
+            print(f"[{name}] crashed: {e!r} / 5秒後に再起動します", flush=True)
+            await asyncio.sleep(5)
+
+
 async def _dj_bot_loop() -> None:
     """自動DJ局が一定間隔でランダムに次の曲をオンエアし続ける。"""
     await asyncio.sleep(6)
@@ -351,49 +367,57 @@ async def _dj_loop() -> None:
     await asyncio.sleep(5)
     while True:
         await asyncio.sleep(10)
-        if not settings.dj_enabled:
+        try:
+            await _dj_loop_once()
+        except Exception as e:  # noqa: BLE001
+            # 1局の失敗でループ全体が止まらないようにする（次周期で再試行）
+            print(f"[dj_loop] error: {e!r}", flush=True)
+
+
+async def _dj_loop_once() -> None:
+    if not settings.dj_enabled:
+        return
+    for station_id in manager.active_channels():
+        if manager.idle_seconds(station_id) < settings.dj_idle_seconds:
             continue
-        for station_id in manager.active_channels():
-            if manager.idle_seconds(station_id) < settings.dj_idle_seconds:
-                continue
-            async with async_session_factory() as session:
-                station = await session.get(Station, station_id)
-                if station is None or not station.ai_dj_enabled:
-                    manager.touch(station_id)
-                    continue
-                # 停波中（砂嵐）の局には話しかけない
-                if station.status != "live":
-                    continue
-                # 外部連携局（Miaちゃん）は idle DJ を行わない
-                if station.callsign == settings.discord_station_callsign:
-                    manager.touch(station_id)
-                    continue
-                # 自動DJ局以外のDJは「DJを呼ぶ」で呼ばれないと自動退出している
-                # （滞在中だけ独り口を話す。呼ばれていないときは黙る）
-                is_bot_station = await session.get(BotStation, station_id) is not None
-                if not is_bot_station and not dj_is_present(station_id, station):
-                    continue
-                program = station.callsign
-                persona = station.ai_dj_prompt
-                # 今オンエア中の曲（と直前の曲）を渡して、曲に連動したコメントにする
-                track_label = None
-                recent_label = None
-                if settings.dj_track_comment_enabled:
-                    track_label, recent_label = await dj_track_context(session, station)
-            line = await generate_dj_line(
-                program,
-                persona=persona,
-                track=track_label,
-                recent=recent_label,
-            )
-            if not line:
-                # LLM未設定・失敗時は何も投稿しない（定型文は使わない）
+        async with async_session_factory() as session:
+            station = await session.get(Station, station_id)
+            if station is None or not station.ai_dj_enabled:
                 manager.touch(station_id)
                 continue
-            # スレッド紐づけは共通ヘルパーに任せる（付け忘れると掲示板ログから消える）
-            payload = await persist_message(station_id, "DJ", line, is_dj=True)
-            await manager.broadcast(station_id, {"type": "message", **payload})
+            # 停波中（砂嵐）の局には話しかけない
+            if station.status != "live":
+                continue
+            # 外部連携局（Miaちゃん）は idle DJ を行わない
+            if station.callsign == settings.discord_station_callsign:
+                manager.touch(station_id)
+                continue
+            # 自動DJ局以外のDJは「DJを呼ぶ」で呼ばれないと自動退出している
+            # （滞在中だけ独り口を話す。呼ばれていないときは黙る）
+            is_bot_station = await session.get(BotStation, station_id) is not None
+            if not is_bot_station and not dj_is_present(station_id, station):
+                continue
+            program = station.callsign
+            persona = station.ai_dj_prompt
+            # 今オンエア中の曲（と直前の曲）を渡して、曲に連動したコメントにする
+            track_label = None
+            recent_label = None
+            if settings.dj_track_comment_enabled:
+                track_label, recent_label = await dj_track_context(session, station)
+        line = await generate_dj_line(
+            program,
+            persona=persona,
+            track=track_label,
+            recent=recent_label,
+        )
+        if not line:
+            # LLM未設定・失敗時は何も投稿しない（定型文は使わない）
             manager.touch(station_id)
+            continue
+        # スレッド紐づけは共通ヘルパーに任せる（付け忘れると掲示板ログから消える）
+        payload = await persist_message(station_id, "DJ", line, is_dj=True)
+        await manager.broadcast(station_id, {"type": "message", **payload})
+        manager.touch(station_id)
 
 
 async def _lifecycle_loop() -> None:
@@ -543,9 +567,9 @@ async def lifespan(app: FastAPI):
 
     async with _asf() as _session:
         await ensure_all_stations(_session)
-    dj_task = asyncio.create_task(_dj_loop())
-    life_task = asyncio.create_task(_lifecycle_loop())
-    bot_task = asyncio.create_task(_dj_bot_loop())
+    dj_task = asyncio.create_task(_supervise("dj_loop", _dj_loop))
+    life_task = asyncio.create_task(_supervise("lifecycle_loop", _lifecycle_loop))
+    bot_task = asyncio.create_task(_supervise("dj_bot_loop", _dj_bot_loop))
     # Discord 双方向連携（Miaちゃん / 設定時のみ）
     await discord_bot.start()
     # 専用局の自律運行（APScheduler: 10秒間隔）
