@@ -37,6 +37,9 @@
     <p class="input__hint">
       DJは「DJさん」「hey DJ」と呼びかけたときだけ返事します（大文字小文字は問いません）
     </p>
+    <p v-if="!broadcaster" class="input__hint input__hint--sub">
+      リクエストは掲示板への投稿になります（曲の切り替えは開局者・管理者のみ）
+    </p>
   </div>
 </template>
 
@@ -45,6 +48,8 @@ import { ref } from 'vue'
 
 const props = defineProps({
   disabled: { type: Boolean, default: false },
+  // 局のオーナー・管理者はリクエストでBGMを直接切り替えられる（リスナーは掲示板への投稿）
+  broadcaster: { type: Boolean, default: false },
 })
 const emit = defineEmits(['send', 'request-youtube', 'call-dj'])
 
@@ -120,6 +125,11 @@ function callDj() {
   font-size: 11px;
   color: var(--faint);
   line-height: 1.6;
+}
+/* リクエストの挙動（リスナー向けの補足） */
+.input__hint--sub {
+  border-left: 2px solid var(--line-strong);
+  padding-left: 8px;
 }
 
 @media (max-width: 640px) {

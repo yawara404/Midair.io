@@ -59,6 +59,7 @@
         <ChatStream :messages="messages" :my-handle="handle" />
         <MessageInput
           :disabled="!connected"
+          :broadcaster="isBroadcaster"
           @send="sendChat"
           @request-youtube="requestYoutube"
           @call-dj="callDj"
@@ -115,6 +116,8 @@ const track = ref({ videoId: null, startedAt: null })
 const latestTrack = ref(null)
 const trackReloadKey = ref(0)
 const favorited = ref(false)
+// 局のオーナー・管理者かどうか（リクエストでBGMを切り替えられる権限）
+const isBroadcaster = ref(false)
 // モバイル（幅1080px以下）ではチューナーを折りたたんでチャットを最大化する（PCでは常時表示）
 const tunerOpen = ref(false)
 
@@ -177,6 +180,7 @@ function handleEvent(data) {
   switch (data.type) {
     case 'welcome':
       handle.value = data.handle
+      isBroadcaster.value = Boolean(data.is_broadcaster)
       if (data.track) {
         track.value = { videoId: data.track.youtube_video_id, startedAt: data.track.playback_started_at }
       }

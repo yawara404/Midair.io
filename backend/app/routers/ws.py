@@ -88,8 +88,13 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
         }
         user = await session.get(User, user_id) if user_id else None
         username = user.username if user else None
+        user_role = user.role if user else None
 
-    is_broadcaster = bool(user_id and user_id == owner_id)
+    # 開局者（局のオーナー）または管理者は BGM を強制切り替えできる
+    # （他APIの「owner_id != user.id and role != 'admin'」と同じ判定に揃える）
+    is_broadcaster = bool(
+        user_id and (user_id == owner_id or user_role == "admin")
+    )
     handle = username or f"名無しのリスナー#{random.randint(0, 9999):04d}"
 
     await manager.connect(station_id, websocket, handle)
