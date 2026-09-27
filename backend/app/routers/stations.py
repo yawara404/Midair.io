@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -63,6 +63,9 @@ class StationUpdate(BaseModel):
     theme_color: Optional[str] = None
     ai_dj_prompt: Optional[str] = None
     ai_dj_enabled: Optional[bool] = None
+    # DJの自動退出までの分数（None = 既定 / 0 = 退出しない）
+    # 「DJを呼ぶ」で呼ばれてからこの時間だけ独り口を話し、呼ばれなければ退出する
+    dj_stay_minutes: Optional[int] = Field(default=None, ge=0, le=24 * 60)
 
 
 @router.get("/stations")

@@ -19,6 +19,7 @@ from app.routers.frequencies import broadcast_frequency_status
 from app.services.ai_dj import dj_should_reply, generate_dj_line
 from app.services.discord_sync import send_to_discord
 from app.services.dj_announce import schedule_track_change
+from app.services.dj_presence import mark_called as mark_dj_called
 from app.services.messages import persist_message as _persist_message
 from app.services.sessions import (
     current_offset,
@@ -160,6 +161,8 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
                 # LLMで自由思考の返信（Mia局は「Mia」、その他のAI局は「DJ」として）
                 # DJは「DJさん」「hey DJ」と呼びかけられたときだけ返事する（Mia局は常時）
                 if dj_should_reply(station_name, content):
+                    # 呼びかけ＝DJが滞在を開始（自動退出までの時間を延長）
+                    mark_dj_called(station_id)
                     try:
                         from app.services.ai_dj import maybe_chat_reply
 
@@ -278,6 +281,8 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
                     await manager.broadcast(station_id, {"type": "message", **payload})
 
             elif msg_type == "dj_call":
+                # 「DJを呼ぶ」ボタン＝DJが滞在を開始（自動退出までの時間を延長）
+                mark_dj_called(station_id)
                 context = (data.get("content") or "").strip()
                 # 今流れている曲（と直前の曲）を踏まえてDJに話させる
                 track_label = None

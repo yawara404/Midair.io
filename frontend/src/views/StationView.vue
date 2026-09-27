@@ -54,6 +54,14 @@
             class="thread-bar__archive"
             :to="`/archive?station=${currentStation.id}`"
           >過去スレ</router-link>
+          <!-- 開局者・管理者のみ: DJの自動退出などの設定 -->
+          <button
+            v-if="isBroadcaster"
+            class="thread-bar__djset"
+            type="button"
+            title="DJ設定（自動退出までの時間）"
+            @click="djSettingsOpen = true"
+          >🎙 DJ設定</button>
         </div>
 
         <ChatStream :messages="messages" :my-handle="handle" />
@@ -82,6 +90,14 @@
         />
       </div>
     </div>
+
+    <!-- 開局者・管理者向け: DJ設定モーダル（自動退出までの時間） -->
+    <DjSettingsModal
+      :open="djSettingsOpen"
+      :station="currentStation"
+      @close="djSettingsOpen = false"
+      @saved="onDjSettingsSaved"
+    />
   </div>
 </template>
 
@@ -93,6 +109,7 @@ import ChatStream from '../components/ChatStream.vue'
 import MessageInput from '../components/MessageInput.vue'
 import RadioPlayer from '../components/RadioPlayer.vue'
 import PlayLog from '../components/PlayLog.vue'
+import DjSettingsModal from '../components/DjSettingsModal.vue'
 import { api, getToken, wsHost, wsPath } from '../api'
 import { useAuthStore } from '../stores/auth'
 
@@ -118,6 +135,15 @@ const trackReloadKey = ref(0)
 const favorited = ref(false)
 // 局のオーナー・管理者かどうか（リクエストでBGMを切り替えられる権限）
 const isBroadcaster = ref(false)
+// DJ設定モーダル（自動退出までの時間）の開閉
+const djSettingsOpen = ref(false)
+
+// DJ設定を保存したら、その局の情報を最新にする
+function onDjSettingsSaved(station) {
+  if (!station) return
+  const i = stations.value.findIndex((s) => s.id === station.id)
+  if (i >= 0) stations.value[i] = { ...stations.value[i], ...station }
+}
 // モバイル（幅1080px以下）ではチューナーを折りたたんでチャットを最大化する（PCでは常時表示）
 const tunerOpen = ref(false)
 
@@ -542,6 +568,23 @@ onBeforeUnmount(() => {
   padding: 2px 8px;
 }
 .thread-bar__archive:hover {
+  background: var(--green);
+  color: #000;
+}
+/* 開局者・管理者のみ表示: DJ設定を開く（過去スレと同じ見た目） */
+.thread-bar__djset {
+  margin-left: 6px;
+  background: none;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--green);
+  cursor: pointer;
+  text-decoration: none;
+  border: 1px solid var(--line-strong);
+  padding: 2px 8px;
+}
+.thread-bar__djset:hover {
   background: var(--green);
   color: #000;
 }

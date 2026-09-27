@@ -75,6 +75,9 @@ class Station(Base):
     track_duration_sec: Mapped[int] = mapped_column(Integer, default=180)
     # プリセット局（公式局）は常時 ON AIR。切り忘れ対策や OFF AIR 操作で停波しない
     always_on_air: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    # DJの自動退出までの分数（NULL = 既定値を使う / 0 = 退出しない）
+    # 「DJを呼ぶ」と来て、この時間だけ独り口を話し、呼ばれなければ自動退出する
+    dj_stay_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     owner: Mapped["User"] = relationship("User", lazy="selectin")
 
@@ -113,6 +116,7 @@ class Station(Base):
             "is_dedicated": bool(self.is_dedicated),
             "dedicated_genre": self.dedicated_genre,
             "always_on_air": bool(self.always_on_air),
+            "dj_stay_minutes": self.dj_stay_minutes,
             "track_duration_sec": self.track_duration_sec,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

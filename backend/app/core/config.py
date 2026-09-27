@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     # （Discord連携局のMiaちゃんはチャットbotなので常時返事する。
     #   False にすると従来どおり全てのチャットに返事する）
     dj_reply_requires_call: bool = True
+    # 「DJを呼ぶ」ボタン（または呼びかけ）でDJが滞在する秒数。
+    # 自動DJ局（DJ BOT / Vocaloid BOT / 管理者セレクト）以外のDJは、
+    # 呼ばれてからこの時間だけ独り口を話し、呼ばれなければ自動退出して黙る。
+    # 0 にすると従来どおり（呼ばれなくても独り口を話す）になる。
+    dj_stay_seconds: int = 600
 
     # --- 今オンエア中の曲に連動したDJコメント ---
     # アイドルDJ・「DJを呼ぶ」・チャット返信のコメントに、今流れている曲名を渡して

@@ -34,6 +34,7 @@ from app.services import discord_bot
 from app.services.ai_dj import generate_dj_line
 from app.services.auto_off import check_auto_off
 from app.services.bot_dj import play_limit_seconds, play_next
+from app.services.dj_presence import is_present as dj_is_present
 from app.services.messages import persist_message
 from app.services.sessions import (
     clear_now_playing,
@@ -366,6 +367,11 @@ async def _dj_loop() -> None:
                 # 外部連携局（Miaちゃん）は idle DJ を行わない
                 if station.callsign == settings.discord_station_callsign:
                     manager.touch(station_id)
+                    continue
+                # 自動DJ局以外のDJは「DJを呼ぶ」で呼ばれないと自動退出している
+                # （滞在中だけ独り口を話す。呼ばれていないときは黙る）
+                is_bot_station = await session.get(BotStation, station_id) is not None
+                if not is_bot_station and not dj_is_present(station_id, station):
                     continue
                 program = station.callsign
                 persona = station.ai_dj_prompt
