@@ -106,7 +106,7 @@ const autoOffText = computed(() => {
   if (cfg.after_minutes > 0) parts.push(`ON AIR から${minutesText(cfg.after_minutes)}`)
   if (!parts.length) return ''
   const notice = cfg.notice_minutes > 0 ? `（停波の${minutesText(cfg.notice_minutes)}前に放送内で告知します）` : ''
-  return `切り忘れ対策: ${parts.join('、または ')}経過すると自動で停波します${notice}。24時間流し続けたい場合は専用局（24時間常設）を申請してください（専用局・自動DJ局・番組枠は対象外）。`
+  return `切り忘れ対策: ${parts.join('、または ')}経過すると自動で停波します${notice}。24時間流し続けたい場合は専用局（24時間常設）を申請してください（専用局・自動DJ局・常時ON AIRのプリセット局・番組枠は対象外）。`
 })
 
 function fmt(iso) {

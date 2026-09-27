@@ -259,7 +259,12 @@ async function loadStations() {
     stations.value = res.stations || []
     if (!stations.value.length) return
     const routeId = Number(route.params.id)
-    const target = stations.value.find((s) => s.id === routeId) || stations.value[0]
+    const target = stations.value.find((s) => s.id === routeId)
+    if (!target) {
+      // 存在しない局（廃局済みのブックマーク等）はホームへ戻す
+      router.replace('/')
+      return
+    }
     tuneTo(target)
   } catch (e) {
     console.error(e)

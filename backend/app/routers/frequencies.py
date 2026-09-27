@@ -358,6 +358,11 @@ async def station_off_air(
 ):
     """停波（OFF AIR）。砂嵐・告知画面へ。放送セッションを自動クローズする。"""
     station = _require_owner(await db.get(Station, station_id), user)
+    if station.always_on_air:
+        raise HTTPException(
+            status_code=400,
+            detail="この局は常時ON AIRのプリセット局です（停波できません）",
+        )
     station.set_status("off_air")
     await db.commit()
     session = await close_session(db, station_id)

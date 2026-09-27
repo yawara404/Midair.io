@@ -392,7 +392,15 @@ async def delete_message(
         raise HTTPException(status_code=403, detail="モデレーション権限がありません")
     msg = await db.get(Message, message_id)
     if msg and msg.station_id == station_id:
+        thread_id = msg.thread_id
         await db.delete(msg)
+        # スレッドの投稿数も戻す（1000投稿での自動アーカイブ判定がずれないように）
+        if thread_id is not None:
+            from app.models.models import Thread
+
+            thread = await db.get(Thread, thread_id)
+            if thread is not None and (thread.post_count or 0) > 0:
+                thread.post_count -= 1
         await db.commit()
         await manager.broadcast(station_id, {"type": "message_deleted", "id": message_id})
     return {"success": True}

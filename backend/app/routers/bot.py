@@ -56,6 +56,9 @@ async def next_bot_track(
 ):
     """今の曲を打ち切って次の曲へ。"""
     station = _require_owner(await db.get(Station, station_id), user)
+    # 自動DJ局以外では実行しない（通常局のBGMが勝手に変わるのを防ぐ）
+    if await db.get(BotStation, station_id) is None:
+        raise HTTPException(status_code=404, detail="自動DJ局が見つかりません")
     await play_next(db, station)
     return {"success": True}
 
