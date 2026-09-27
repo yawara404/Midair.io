@@ -173,6 +173,7 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, getToken, wsHost, wsPath } from '../api'
+import { toastOk, toastInfo, toastError } from '../toast'
 import { useAuthStore } from '../stores/auth'
 import DedicatedApplyForm from '../components/DedicatedApplyForm.vue'
 
@@ -327,8 +328,10 @@ async function openStation() {
     openCallsign.value = ''
     await load()
     selected.value = slots.value.find((s) => s.frequency === selected.value.frequency)
+    toastOk('開局しました（ON AIR）')
   } catch (e) {
     error.value = e.message
+    toastError(`開局に失敗しました: ${e.message}`)
   }
 }
 
@@ -349,8 +352,10 @@ async function doReserve() {
     showReserve.value = false
     await load()
     selected.value = slots.value.find((s) => s.frequency === selected.value.frequency)
+    toastOk('時間枠を予約しました')
   } catch (e) {
     error.value = e.message
+    toastError(`予約に失敗しました: ${e.message}`)
   }
 }
 
@@ -360,8 +365,10 @@ async function cancelReservation() {
     await api(`/reservations/${selected.value.reservation.id}`, { method: 'DELETE' })
     await load()
     selected.value = slots.value.find((s) => s.frequency === selected.value.frequency)
+    toastOk('予約を取消しました')
   } catch (e) {
     error.value = e.message
+    toastError(`取消に失敗しました: ${e.message}`)
   }
 }
 
@@ -370,8 +377,10 @@ async function setLive(action) {
     await api(`/stations/${selected.value.station_id}/${action}`, { method: 'POST' })
     await load()
     selected.value = slots.value.find((s) => s.frequency === selected.value.frequency)
+    toastOk(action === 'on-air' ? 'ON AIR にしました' : '停波しました（OFF AIR）')
   } catch (e) {
     error.value = e.message
+    toastError(`切替に失敗しました: ${e.message}`)
   }
 }
 
@@ -381,8 +390,10 @@ async function closeStation() {
     await api(`/stations/${selected.value.station_id}`, { method: 'DELETE' })
     await load()
     selected.value = slots.value.find((s) => s.frequency === selected.value.frequency)
+    toastOk('廃局しました（周波数を返還）')
   } catch (e) {
     error.value = e.message
+    toastError(`廃局に失敗しました: ${e.message}`)
   }
 }
 

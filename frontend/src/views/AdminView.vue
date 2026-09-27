@@ -70,6 +70,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { api } from '../api'
+import { toastOk, toastInfo, toastError } from '../toast'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -122,6 +123,7 @@ async function approve(a) {
       body: JSON.stringify({ note: notes[a.id] || '' }),
     })
     await load()
+    toastOk(`${a.callsign || '申請'} を承認しました`)
   } catch (e) {
     errors[a.id] = e.message
   } finally {
@@ -139,6 +141,7 @@ async function reject(a) {
       body: JSON.stringify({ note: notes[a.id] || '' }),
     })
     await load()
+    toastInfo(`${a.callsign || '申請'} を却下しました`)
   } catch (e) {
     errors[a.id] = e.message
   } finally {

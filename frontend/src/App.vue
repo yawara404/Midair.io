@@ -156,6 +156,9 @@
     <main class="app-main">
       <router-view />
     </main>
+
+    <!-- 操作の結果を伝える通知（右下・数秒で消える／タップでも閉じる） -->
+    <ToastHost />
   </div>
 </template>
 
@@ -164,6 +167,7 @@ import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { api } from './api'
+import ToastHost from './components/ToastHost.vue'
 
 const auth = useAuthStore()
 const route = useRoute()

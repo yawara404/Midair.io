@@ -35,6 +35,13 @@
           {{ currentStation ? currentStation.callsign : '—' }}
           <span v-if="currentStation && currentStation.is_bot" class="now__bot">🤖 AUTO DJ</span>
           <span class="now__freq">{{ frequency.toFixed(1) }} MHz</span>
+          <span class="now__listeners" title="いま聴いている人数">👥 {{ listenerCount }}</span>
+          <button
+            class="btn btn--ghost now__share"
+            type="button"
+            title="この局のURLをコピー"
+            @click="copyLink"
+          >🔗</button>
           <button
             v-if="auth.isLoggedIn"
             class="btn btn--ghost now__fav"
@@ -115,6 +122,7 @@ import RadioPlayer from '../components/RadioPlayer.vue'
 import PlayLog from '../components/PlayLog.vue'
 import DjModal from '../components/DjModal.vue'
 import { api, getToken, wsHost, wsPath } from '../api'
+import { toastOk, toastInfo, toastError } from '../toast'
 import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
@@ -156,6 +164,21 @@ function openDjSettings() {
   djCallText.value = ''
   djModalMode.value = 'settings'
   djModalOpen.value = true
+}
+
+// この局のURLをコピー（コピーできない環境ではURLを通知に出す）
+async function copyLink() {
+  const url = `${location.origin}${location.pathname}`
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(url)
+      toastOk('この局のURLをコピーしました')
+      return
+    }
+    throw new Error('clipboard unavailable')
+  } catch (e) {
+    toastInfo(url)
+  }
 }
 
 // モーダルの「DJを呼ぶ」→ WebSocket で dj_call を送る
@@ -435,11 +458,15 @@ async function toggleFavorite() {
     if (favorited.value) {
       await api(`/stations/${s.id}/favorite`, { method: 'DELETE' })
       favorited.value = false
+      toastInfo('お気に入りから外しました')
     } else {
       await api(`/stations/${s.id}/favorite`, { method: 'POST' })
       favorited.value = true
+      toastOk('★ お気に入りに追加しました')
     }
-  } catch (e) {}
+  } catch (e) {
+    toastError(`お気に入りを更新できませんでした: ${e.message}`)
+  }
 }
 
 watch(
@@ -550,6 +577,19 @@ onBeforeUnmount(() => {
   margin-left: auto;
   color: var(--green);
   font-variant-numeric: tabular-nums;
+}
+/* リスナー数とURLコピー（常時表示の now バーに出す） */
+.now__listeners {
+  margin-left: 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.now__share {
+  margin-left: 8px;
+  padding: 2px 6px;
+  font-size: 12px;
 }
 .now__fav {
   margin-left: 8px;

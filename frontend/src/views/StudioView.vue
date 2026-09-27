@@ -84,6 +84,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { api } from '../api'
+import { toastOk, toastInfo, toastError } from '../toast'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -145,15 +146,16 @@ async function load() {
       }
     }
   } catch (e) {
-    console.error(e)
+    toastError(`読み込みに失敗しました: ${e.message}`)
   }
 }
 
 async function nextBotTrack(s) {
   try {
     await api(`/stations/${s.id}/bot/next`, { method: 'POST' })
+    toastOk('次の曲に切り替えました')
   } catch (e) {
-    console.error(e)
+    toastError(`切り替えに失敗しました: ${e.message}`)
   }
 }
 
@@ -168,28 +170,34 @@ async function saveStation(s) {
         ai_dj_prompt: s.ai_dj_prompt,
       }),
     })
+    toastOk('局の設定を保存しました')
   } catch (e) {
-    console.error(e)
+    toastError(`保存に失敗しました: ${e.message}`)
   }
 }
 
 async function setBgm(s) {
   const url = bgmUrl[s.id] || ''
-  if (!url) return
+  if (!url) {
+    toastError('YouTube URL / 動画ID を入力してください')
+    return
+  }
   try {
     await api(`/stations/${s.id}/youtube`, { method: 'POST', body: JSON.stringify({ url }) })
     bgmUrl[s.id] = ''
     s.is_live = true
+    toastOk('BGMを切り替えました')
   } catch (e) {
-    console.error(e)
+    toastError(`BGMの切替に失敗しました: ${e.message}`)
   }
 }
 
 async function mute(s) {
   try {
     await api(`/stations/${s.id}/mute`, { method: 'POST' })
+    toastOk('BGMを停止しました（ミュート）')
   } catch (e) {
-    console.error(e)
+    toastError(`ミュートに失敗しました: ${e.message}`)
   }
 }
 
@@ -198,8 +206,9 @@ async function setAir(s, action) {
     const res = await api(`/stations/${s.id}/${action}`, { method: 'POST' })
     s.status = res.status
     s.is_live = res.status === 'live'
+    toastOk(res.status === 'live' ? 'ON AIR にしました' : '停波しました（OFF AIR）')
   } catch (e) {
-    console.error(e)
+    toastError(`切替に失敗しました: ${e.message}`)
   }
 }
 
@@ -208,14 +217,18 @@ async function closeStation(s) {
   try {
     await api(`/stations/${s.id}`, { method: 'DELETE' })
     mine.value = mine.value.filter((x) => x.id !== s.id)
+    toastOk('廃局しました（周波数を返還）')
   } catch (e) {
-    console.error(e)
+    toastError(`廃局に失敗しました: ${e.message}`)
   }
 }
 
 async function addProgram(s) {
   const f = newProg[s.id]
-  if (!f || !f.title || !f.start_time || !f.end_time) return
+  if (!f || !f.title || !f.start_time || !f.end_time) {
+    toastError('番組名・開始・終了を入力してください')
+    return
+  }
   try {
     await api(`/stations/${s.id}/programs`, {
       method: 'POST',
@@ -232,8 +245,9 @@ async function addProgram(s) {
     f.default_youtube_id = ''
     const pr = await api(`/stations/${s.id}/programs`)
     s.programs = pr.programs || []
+    toastOk('番組を追加しました')
   } catch (e) {
-    console.error(e)
+    toastError(`番組の追加に失敗しました: ${e.message}`)
   }
 }
 
@@ -245,8 +259,9 @@ async function deleteProgram(p) {
       const pr = await api(`/stations/${s.id}/programs`)
       s.programs = pr.programs || []
     }
+    toastOk('番組を削除しました')
   } catch (e) {
-    console.error(e)
+    toastError(`番組の削除に失敗しました: ${e.message}`)
   }
 }
 

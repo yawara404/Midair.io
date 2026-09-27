@@ -140,6 +140,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { api } from '../api'
+import { toastOk, toastInfo, toastError } from '../toast'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -226,8 +227,9 @@ async function setAir(s, action) {
     const res = await api(`/stations/${s.id}/${action}`, { method: 'POST' })
     s.status = res.status
     s.is_live = res.status === 'live'
+    toastOk(res.status === 'live' ? 'ON AIR にしました' : '停波しました（OFF AIR）')
   } catch (e) {
-    console.error(e)
+    toastError(`切替に失敗しました: ${e.message}`)
   }
 }
 
@@ -237,8 +239,9 @@ async function closeStation(s) {
     await api(`/stations/${s.id}`, { method: 'DELETE' })
     stations.value = stations.value.filter((x) => x.id !== s.id)
     await loadProfile()
+    toastOk('廃局しました（周波数を返還）')
   } catch (e) {
-    console.error(e)
+    toastError(`廃局に失敗しました: ${e.message}`)
   }
 }
 

@@ -82,7 +82,7 @@
 // 「DJを呼ぶ」モーダル（呼び出し＋滞在時間の設定）。
 // mode='call'    : DJを呼ぶ（任意でひとことも送れる。開局者なら滞在時間も同時に保存）
 // mode='settings': 滞在時間だけを変更
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api } from '../api'
 
 const props = defineProps({
@@ -130,6 +130,18 @@ watch(
   },
   { immediate: true }
 )
+
+// 開いている間は Esc で閉じ、Enter で「DJを呼ぶ」できるようにする
+function onKeydown(e) {
+  if (!props.open) return
+  if (e.key === 'Escape') {
+    close()
+  } else if (e.key === 'Enter' && props.mode === 'call' && !sending.value) {
+    submitCall()
+  }
+}
+onMounted(() => document.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
 
 // 滞在時間を保存する（開局者・管理者のみ。変更が無ければ何もしない）
 async function persistStay() {
