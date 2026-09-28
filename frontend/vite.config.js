@@ -26,6 +26,20 @@ export default defineConfig({
     __VUE_PROD_DEVTOOLS__: 'false',
     __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: 'false',
   },
+  build: {
+    // 遅延読み込み（ルート分割）で初回JSを小さくする。
+    // modulepreload のポリフィルは古いブラウザ向けのため無効化
+    // （対応ブラウザでは元から不要。ついでに成果物も少し小さくなる）
+    modulePreload: { polyfill: false },
+    rollupOptions: {
+      output: {
+        // ベンダー（Vue本体）とアプリを分けてキャッシュ効率を上げる
+        manualChunks: {
+          vendor: ['vue', 'vue-router', 'pinia'],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

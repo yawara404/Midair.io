@@ -121,6 +121,7 @@
 - Vue 3 の単一ファイルコンポーネント（SFC）を**唯一のソース**（`frontend/src`）とし、Vite版とスタンドアロン版を同じ SFC からビルド。
 - ルーティングは Vite版が履歴、スタンドアロン版がハッシュ（`#/...`）。API・WebSocket の接続先を環境で自動切替。
 - モバイル最適化：ハンバーグメニュー、タップ領域の確保、固定高チャット＋「最新へ」ボタン、長い文字列のマーキー表示。
+- **負荷対策**：ルート単位の遅延読み込み＋vendor分割で初回JSを削減（gzip 約54KB）、SQLiteはWAL、静的成果物はハッシュ付きURLで長期キャッシュ（HTMLはno-cache）、WebSocketは連投ガード付き。
 - **アクセス解析（GA4）**：`VITE_GA_ID` を設定したビルドだけ計測。SPAのため `src/analytics.js` がルート遷移ごとに `page_view` を送信し、主要操作（`tune_station` / `track_request` / `dj_call` / `favorite_add` など）をイベント計測。`midair_ga_optout=1` で無効化（プライバシーポリシーから切替）。
 - YouTube IFrame Player API による公式埋め込み再生（YouTube 利用規約準拠）。
 

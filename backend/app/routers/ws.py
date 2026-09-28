@@ -36,6 +36,10 @@ router = APIRouter()
 # 同じ局で「DJを呼ぶ」を連打されたときの最終受付時刻（LLM呼び出しの乱用防止）
 _last_dj_call: dict[int, float] = {}
 
+# 連投対策（1接続あたり・この秒数にこの件数まで受け付ける）
+_CHAT_WINDOW_SEC = 10
+_CHAT_MAX_PER_WINDOW = 12
+
 
 def _now() -> datetime:
     return datetime.now()
@@ -128,12 +132,36 @@ async def websocket_endpoint(websocket: WebSocket, station_id: int):
             },
         )
 
+        # 連投対策（1接続あたり）: この接続から受け取ったメッセージの時刻を保持する
+        received_at: list[float] = []
+        last_limit_notice = 0.0
+
         while True:
             try:
                 data = await websocket.receive_json()
             except WebSocketDisconnect:
                 break
             except Exception:
+                continue
+
+            # 連投でDB書き込みとブロードキャストが集中しないように制限する
+            now_ts = time.time()
+            received_at = [t for t in received_at if now_ts - t < _CHAT_WINDOW_SEC]
+            received_at.append(now_ts)
+            if len(received_at) > _CHAT_MAX_PER_WINDOW:
+                if now_ts - last_limit_notice > _CHAT_WINDOW_SEC:
+                    last_limit_notice = now_ts
+                    try:
+                        await websocket.send_json(
+                            {
+                                "type": "error",
+                                "content": (
+                                    "メッセージが多すぎます。少し待ってから送ってください。"
+                                ),
+                            }
+                        )
+                    except Exception:
+                        break
                 continue
 
             msg_type = data.get("type", "chat")

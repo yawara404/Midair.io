@@ -1,17 +1,19 @@
 import { createRouter, createWebHistory, createWebHashHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
-import StationsView from '../views/StationsView.vue'
-import FrequencyMapView from '../views/FrequencyMapView.vue'
-import StationView from '../views/StationView.vue'
-import LoginView from '../views/LoginView.vue'
-import StudioView from '../views/StudioView.vue'
-import TimetableView from '../views/TimetableView.vue'
-import ArchiveView from '../views/ArchiveView.vue'
-import ThreadView from '../views/ThreadView.vue'
-import ProfileView from '../views/ProfileView.vue'
-import DedicatedView from '../views/DedicatedView.vue'
-import AdminView from '../views/AdminView.vue'
-import MidAirCard from '../components/MidAirCard.vue'
+
+// ホーム以外は遅延読み込み（初回表示のJSを小さくして負荷と待ち時間を減らす）
+const StationsView = () => import('../views/StationsView.vue')
+const FrequencyMapView = () => import('../views/FrequencyMapView.vue')
+const StationView = () => import('../views/StationView.vue')
+const LoginView = () => import('../views/LoginView.vue')
+const StudioView = () => import('../views/StudioView.vue')
+const TimetableView = () => import('../views/TimetableView.vue')
+const ArchiveView = () => import('../views/ArchiveView.vue')
+const ThreadView = () => import('../views/ThreadView.vue')
+const ProfileView = () => import('../views/ProfileView.vue')
+const DedicatedView = () => import('../views/DedicatedView.vue')
+const AdminView = () => import('../views/AdminView.vue')
+const MidAirCard = () => import('../components/MidAirCard.vue')
 
 // スタンドアロン（Live Server 等の静的サーバー）ではハッシュルーティング、
 // Vite dev / 通常ビルドでは履歴ルーティングを使う。

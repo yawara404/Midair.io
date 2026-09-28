@@ -133,10 +133,11 @@ class Program(Base):
     )
     title: Mapped[str] = mapped_column(String(150))
     description: Mapped[str] = mapped_column(Text, default="")
-    start_time: Mapped[datetime] = mapped_column(DateTime)
-    end_time: Mapped[datetime] = mapped_column(DateTime)
+    # タイムテーブル／ライフサイクル（番組の開始・終了判定）で使う
+    start_time: Mapped[datetime] = mapped_column(DateTime, index=True)
+    end_time: Mapped[datetime] = mapped_column(DateTime, index=True)
     default_youtube_id: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
-    is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     station: Mapped["Station"] = relationship("Station", lazy="selectin")
@@ -313,9 +314,10 @@ class Reservation(Base):
     callsign: Mapped[str] = mapped_column(String(50), default="")
     note: Mapped[str] = mapped_column(Text, default="")
     start_time: Mapped[datetime] = mapped_column(DateTime)
-    end_time: Mapped[datetime] = mapped_column(DateTime)
+    # ライフサイクル（終了した予約の失効処理）で使う
+    end_time: Mapped[datetime] = mapped_column(DateTime, index=True)
     # active / cancelled / expired
-    status: Mapped[str] = mapped_column(String(16), default="active")
+    status: Mapped[str] = mapped_column(String(16), default="active", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     user: Mapped["User"] = relationship("User", lazy="selectin")

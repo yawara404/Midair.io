@@ -12,11 +12,17 @@ API / WebSocket はトンネルの ingress で localhost:8000 に振り分けら
 このサーバーは静的配信のみを担当する。
 """
 import os
+import re
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 DIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
 PREFIX = "/Midair.io"
 PORT = int(os.environ.get("PORT", "8090"))
+
+# ハッシュ付きファイル名（Viteのビルド成果物）。内容が変わると名前も変わるので長期キャッシュできる
+HASHED = re.compile(r"-[A-Za-z0-9_-]{8,}\.(js|css|png|jpg|jpeg|svg|webp|woff2?)$", re.I)
+# ほぼ静的なファイル（内容が変わるときはURLかキャッシュ期間で調整）
+STATIC_EXT = re.compile(r"\.(png|jpg|jpeg|svg|webp|ico|woff2?|txt|xml)$", re.I)
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -48,6 +54,21 @@ class Handler(SimpleHTTPRequestHandler):
 
     def log_message(self, fmt, *args):
         pass
+
+    def end_headers(self):
+        """負荷対策（再訪時の転送量削減）: 内容に応じた Cache-Control を付ける。"""
+        path = self.path.split("?")[0]
+        if HASHED.search(os.path.basename(path)):
+            # ビルド成果物（ハッシュ付き）は内容が変わるとURLも変わる
+            self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+        elif path.endswith("/") or path.endswith(".html"):
+            # HTMLは常に最新を確認（デプロイ直後の取りこぼし防止）
+            self.send_header("Cache-Control", "no-cache")
+        elif STATIC_EXT.search(path):
+            self.send_header("Cache-Control", "public, max-age=86400")
+        else:
+            self.send_header("Cache-Control", "public, max-age=3600")
+        super().end_headers()
 
 
 if __name__ == "__main__":
