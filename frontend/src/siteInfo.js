@@ -8,7 +8,7 @@ export const OPERATOR = {
   github: 'https://github.com/yawara404/Midair.io',
   publicUrl: 'https://music.wawa-app.me/Midair.io/',
 }
-export const UPDATED = '2026-09-26'
+export const UPDATED = '2026-09-28'
 
 export const KEYS = ['about', 'privacy', 'terms', 'sitemap']
 
@@ -84,14 +84,22 @@ export const PAGES = {
       {
         h: 'Cookie・ローカルストレージ',
         items: [
-          '広告・アクセス解析を目的とした Cookie は使用していません。',
+          '広告配信・プロファイリングを目的とした Cookie は使用していません。',
+          'アクセス解析（Google アナリティクス）は、利用状況の把握のために Cookie（_ga など）を使用します。プライバシーポリシー下部の「アクセス解析を無効にする」を押すと停止でき、以降は読み込まれません。',
           'ログイン状態を保つため、お使いのブラウザの localStorage にトークン（midair_token）とユーザー情報（midair_user）を保存します。ログアウトすると削除されます。',
         ],
       },
       {
-        h: 'アクセス解析',
+        h: 'アクセス解析（Google アナリティクス）',
         items: [
-          'アクセス解析ツールは導入していません（Google Search Console の所有権確認用メタタグのみ）。',
+          'ページビュー・滞在時間・参照元・端末やブラウザの種別などを、個人を特定しない形で集計しています（GA4）。',
+          'IPアドレスの匿名化が有効で、広告向けの機能（Google シグナル・広告のパーソナライズ）は使用していません。',
+          '計測を望まない場合は、下の「アクセス解析を無効にする」を押してください（設定はお使いのブラウザに保存され、以降は計測用の Cookie も設定されません）。',
+          'Google Search Console の所有権確認用メタタグも設置しています（検索流入の把握のみ）。',
+        ],
+        links: [
+          { label: 'Google プライバシーポリシー', href: 'https://policies.google.com/privacy' },
+          { label: 'Google アナリティクス オプトアウト アドオン', href: 'https://tools.google.com/dlpage/gaoptout' },
         ],
       },
       {

@@ -47,6 +47,27 @@
     で生成した assets/app.js / assets/app.css を読み込む。
     この index.html 自体は変更不要な薄いシェル。
   -->
+  <!-- Google Analytics（GA4）: 計測する場合は GA_ID に測定ID（G-XXXXXXXXXX）を入れてください。
+       スタンドアロン版（Live Server 等のローカル確認用）は既定で計測しません。 -->
+  <script>
+    (function () {
+      var GA_ID = ''
+      if (!/^G-[A-Z0-9]{4,}$/i.test(GA_ID)) return
+      try {
+        if (localStorage.getItem('midair_ga_optout') === '1') return
+      } catch (e) {}
+      var s = document.createElement('script')
+      s.async = true
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(GA_ID)
+      document.head.appendChild(s)
+      window.dataLayer = window.dataLayer || []
+      window.gtag = function () {
+        window.dataLayer.push(arguments)
+      }
+      window.gtag('js', new Date())
+      window.gtag('config', GA_ID, { send_page_view: false })
+    })()
+  </script>
   <link rel="stylesheet" href="./assets/app.css" />
 </head>
 

@@ -122,6 +122,7 @@ import RadioPlayer from '../components/RadioPlayer.vue'
 import PlayLog from '../components/PlayLog.vue'
 import DjModal from '../components/DjModal.vue'
 import { api, getToken, wsHost, wsPath } from '../api'
+import { trackEvent } from '../analytics'
 import { toastOk, toastInfo, toastError } from '../toast'
 import { useAuthStore } from '../stores/auth'
 
@@ -184,6 +185,11 @@ async function copyLink() {
 // モーダルの「DJを呼ぶ」→ WebSocket で dj_call を送る
 function onDjCall(message) {
   callDj((message || '').trim())
+  // 計測: DJの呼び出し
+  trackEvent('dj_call', {
+    station_id: currentStation.value ? currentStation.value.id : null,
+    with_message: Boolean((message || '').trim()),
+  })
 }
 
 // DJ設定を保存したら、その局の情報を最新にする
@@ -355,6 +361,12 @@ function onDial(freq) {
 function commitDial() {
   const s = pendingStation.value
   if (!s || !dialDiffers.value) return
+  // 計測: 局の切り替え（ユーザー操作）
+  trackEvent('tune_station', {
+    station_id: s.id,
+    frequency: s.frequency,
+    callsign: s.callsign,
+  })
   if (Number(route.params.id) === s.id) {
     // URL は既にこの局を指している（直接来た場合など）→ 受信だけ切り替える
     tuneTo(s)
@@ -384,6 +396,11 @@ function sendChat(text) {
 function requestYoutube(value) {
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({ type: 'youtube_request', url: value }))
+    // 計測: 楽曲リクエスト（開局者・管理者の場合はその場でBGMが変わる）
+    trackEvent('track_request', {
+      station_id: currentStation.value ? currentStation.value.id : null,
+      broadcaster: isBroadcaster.value,
+    })
   }
 }
 
@@ -459,10 +476,12 @@ async function toggleFavorite() {
       await api(`/stations/${s.id}/favorite`, { method: 'DELETE' })
       favorited.value = false
       toastInfo('お気に入りから外しました')
+      trackEvent('favorite_remove', { station_id: s.id, frequency: s.frequency })
     } else {
       await api(`/stations/${s.id}/favorite`, { method: 'POST' })
       favorited.value = true
       toastOk('★ お気に入りに追加しました')
+      trackEvent('favorite_add', { station_id: s.id, frequency: s.frequency })
     }
   } catch (e) {
     toastError(`お気に入りを更新できませんでした: ${e.message}`)

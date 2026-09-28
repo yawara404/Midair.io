@@ -31,6 +31,19 @@
         </div>
         <div class="info-modal__body">
           <InfoSections :page="current" />
+
+          <!-- プライバシーポリシーには、アクセス解析の有効/無効の切替を置く -->
+          <div v-if="isPrivacyPage" class="info-modal__ga">
+            <span class="info-modal__ga-state">
+              アクセス解析（Google アナリティクス）: {{ gaStateLabel }}
+            </span>
+            <button
+              class="btn btn--ghost"
+              type="button"
+              :disabled="!gaConfigured"
+              @click="toggleAnalytics"
+            >{{ gaOptOut ? '有効に戻す' : '無効にする' }}</button>
+          </div>
         </div>
         <div class="info-modal__foot">
           
@@ -42,16 +55,31 @@
 </template>
 
 <script setup>
-import { ref, watch, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import InfoSections from './InfoSections.vue'
 import { KEYS, PAGES, pageByPath } from '../siteInfo'
+import { isAnalyticsConfigured, isAnalyticsOptOut, setAnalyticsOptOut } from '../analytics'
 
 const route = useRoute()
 const router = useRouter()
 
 const current = ref(null)
 const year = new Date().getFullYear()
+
+// アクセス解析（Google アナリティクス）の状態と無効化
+const gaConfigured = isAnalyticsConfigured()
+const gaOptOut = ref(isAnalyticsOptOut())
+const gaStateLabel = computed(() => {
+  if (!gaConfigured) return 'このビルドでは未設定（計測していません）'
+  return gaOptOut.value ? '無効（あなたの設定）' : '有効'
+})
+const isPrivacyPage = computed(() => Boolean(current.value && current.value.path === '/privacy'))
+
+// 切替後はページを再読み込みして反映する（読み込み済みの計測タグを止めるため）
+function toggleAnalytics() {
+  setAnalyticsOptOut(!gaOptOut.value)
+}
 
 // ルート（/privacy /terms /sitemap /about）とモーダルの表示を同期する。
 //  - フッターのリンク・直リンクでパスが変わったらモーダルを開く
@@ -196,6 +224,25 @@ onBeforeUnmount(() => {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   padding: 14px 16px 6px;
+}
+/* アクセス解析（Google アナリティクス）の無効化 */
+.info-modal__ga {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 4px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-deep);
+}
+.info-modal__ga-state {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.info-modal__ga .btn {
+  white-space: nowrap;
 }
 .info-modal__foot {
   flex-shrink: 0;

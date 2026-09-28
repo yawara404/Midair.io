@@ -37,6 +37,34 @@
         "inLanguage": "ja"
       }
     </script>
+
+    <!-- Google Analytics（GA4）
+         - build 時に VITE_GA_ID（例: G-XXXXXXXXXX）が設定されているときだけ読み込みます
+           （未設定なら何もしません）
+         - プライバシーポリシーの「アクセス解析を無効にする」で localStorage に
+           midair_ga_optout = 1 が入っている場合は読み込みません
+         - ページビューはSPA側（src/analytics.js）がルート遷移ごとに送ります -->
+    <script>
+      (function () {
+        var GA_ID = '%VITE_GA_ID%'
+        window.__MIDAIR_GA_ID__ = GA_ID || ''
+        if (!/^G-[A-Z0-9]{4,}$/i.test(GA_ID)) return
+        try {
+          if (localStorage.getItem('midair_ga_optout') === '1') return
+        } catch (e) {}
+        var s = document.createElement('script')
+        s.async = true
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(GA_ID)
+        document.head.appendChild(s)
+        window.dataLayer = window.dataLayer || []
+        window.gtag = function () {
+          window.dataLayer.push(arguments)
+        }
+        window.gtag('js', new Date())
+        // ページビューはルーター遷移ごとに送るので自動送信はオフ
+        window.gtag('config', GA_ID, { send_page_view: false })
+      })()
+    </script>
   </head>
   <body>
     <!-- JS 読み込み前 / 非JSクローラー向けの静的コンテンツ（Vue がマウントすると置き換わります） -->
