@@ -4,7 +4,7 @@
 > リスナーは「名無し」で聴き、やがて自分で周波数を取得して開局（パーソナリティ）へステップアップできます。
 
 ## 公開URL
-- https://music.wawa-app.me/Midair.io/
+- https://radio.wawa-app.me/Midair.io/
 
 ## 概要
 - 周波数: 76.0〜89.0 MHz（0.1MHz 刻み）。チューナーで合わせて局（ステーション）へ入ります。
@@ -25,10 +25,10 @@
 
 ## ポリシー / サイト情報（ハッシュ無しの通常パスで直リンク可）
 ホーム下部のフッターから開けます。URL はハッシュ（`#privacy`）ではなく通常のパスになり、内容はモーダルで表示されます。
-- https://music.wawa-app.me/Midair.io/privacy プライバシーポリシー
-- https://music.wawa-app.me/Midair.io/terms 利用規約・免責
-- https://music.wawa-app.me/Midair.io/sitemap サイトマップ
-- https://music.wawa-app.me/Midair.io/about このサイトについて（運営・お問い合わせ）
+- https://radio.wawa-app.me/Midair.io/privacy プライバシーポリシー
+- https://radio.wawa-app.me/Midair.io/terms 利用規約・免責
+- https://radio.wawa-app.me/Midair.io/sitemap サイトマップ
+- https://radio.wawa-app.me/Midair.io/about このサイトについて（運営・お問い合わせ）
 
 ## 連絡先
 - リポジトリ: https://github.com/yawara404/Midair.io

@@ -1,8 +1,8 @@
 # Midair.io（ミッドエア）
 
-> **お試し公開URL**: https://music.wawa-app.me/Midair.io/
+> **公開URL**: https://radio.wawa-app.me/Midair.io/
 > （Cloudflare Tunnel による公開のため、サーバー停止中はアクセスできません）
-> **最終更新**: 2026-09-28（周波数チューナー／AI DJ／自動DJ局／常時ON AIR／使いやすさ改善）
+> **最終更新**: 2026-09-28（公開URLを専用サブドメイン radio.wawa-app.me へ移行／周波数チューナー／AI DJ／自動DJ局／常時ON AIR／使いやすさ改善）
 
 周波数をダイヤルで合わせて各チャンネル（番組）に入る、24時間リアルタイム匿名BBS。
 リスナーは「名無し」で聴き、やがて自分で周波数を取得して**開局（パーソナリティ）**へステップアップできる、ミニFM放送局システムです。
@@ -113,7 +113,7 @@
 ├─ SQLAlchemy（SQLite 既定 / MySQL 切替）
 └─ APScheduler（専用局の自律運行）
 
-公開: Cloudflare Tunnel + Cloudflare Worker（パス分岐）
+公開: Cloudflare Tunnel（専用サブドメイン radio.wawa-app.me を /Midair.io/ パスで配信。Worker 不使用）
 ```
 
 ### フロントエンド

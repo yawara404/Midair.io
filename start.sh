@@ -4,10 +4,10 @@
 #
 # 以下を一括起動します:
 #   1) バックエンド   (FastAPI / Uvicorn)   : http://127.0.0.1:8000
-#   2) フロント静的配信 (serve_frontend.py) : http://127.0.0.1:8090/Midair.io/
+#   2) フロント静的配信 (serve_frontend.py) : http://127.0.0.1:8090/
 #   3) Cloudflare Tunnel (midair)          : 公開URLへの入口
 #
-# 公開URL: https://music.wawa-app.me/Midair.io/
+# 公開URL: https://radio.wawa-app.me/  （サブパス維持なら .../Midair.io/。下の PUBLIC_PREFIX で切替）
 #
 # 使い方:
 #   ./start.sh            # 起動（既存の MidAir プロセスは停止してから起動）
@@ -29,8 +29,19 @@ LOG_DIR="${SCRIPT_DIR}/logs"
 BACKEND_HOST="127.0.0.1"
 BACKEND_PORT="8000"
 FRONTEND_PORT="8090"
-ROOT_PATH="/Midair.io"
 TUNNEL_NAME="midair"
+
+# --- 公開URL（Cloudflare Tunnel が受ける） ---------------------------------
+# 公開ホスト名は固定。サブパスを維持するか（vocaloid.hz 方式）ルート直下で
+# 配信するかは PUBLIC_PREFIX の1行だけで切り替えられます。
+#   PUBLIC_PREFIX=""            → https://radio.wawa-app.me/            （ルート直下配信）
+#   PUBLIC_PREFIX="/Midair.io"  → https://radio.wawa-app.me/Midair.io/  （vocaloid.hz と同じ）
+# 切替時は ROOT_PATH（API）・BASE_PATH（Vite）・serve_frontend.py の PREFIX が
+# ここから自動で揃い、dist も必要なら自動で作り直します。
+PUBLIC_HOST="radio.wawa-app.me"
+PUBLIC_PREFIX="/Midair.io"
+PUBLIC_URL="https://${PUBLIC_HOST}${PUBLIC_PREFIX}"
+ROOT_PATH="${PUBLIC_PREFIX}"
 
 # 既存プロセス検出・停止用のパターン（他サービスを巻き込まないよう具体的に指定）
 PATTERNS=(
@@ -105,7 +116,7 @@ status_all() {
     fi
     printf '  [%s] %-32s %s\n' "$label" "$pattern" "$pids"
   done
-  printf '\n  公開URL: https://music.wawa-app.me%s/\n' "$ROOT_PATH"
+  printf '\n  公開URL: %s/\n' "$PUBLIC_URL"
 }
 
 wait_port_free() {
@@ -135,29 +146,35 @@ ensure_env() {
     cp "${BACKEND_DIR}/.env.example" "$env_file"
   fi
 
-  # 公開（サブパス /Midair.io）には ROOT_PATH が必須。
-  # .env.example には含まれないため、無ければ追記し、空なら値を入れる。
-  if ! grep -q '^ROOT_PATH=' "$env_file"; then
-    log ".env に ROOT_PATH=${ROOT_PATH} を追記します"
+  # ROOT_PATH（API の root_path）は公開パスに揃える。
+  #   ルート直下配信 → 空 / サブパス維持（PUBLIC_PREFIX=/Midair.io）→ /Midair.io
+  local want="ROOT_PATH=${ROOT_PATH}"
+  local tmp
+  if grep -q '^ROOT_PATH=' "$env_file"; then
+    if ! grep -qx "$want" "$env_file"; then
+      log ".env の ROOT_PATH を '${ROOT_PATH}' に揃えます"
+      tmp="$(mktemp)"
+      sed "s|^ROOT_PATH=.*|${want}|" "$env_file" > "$tmp" && mv "$tmp" "$env_file"
+    fi
+  else
+    log ".env に ROOT_PATH='${ROOT_PATH}' を追記します"
     {
-      printf '\n# --- サブパス配信（Cloudflare Tunnel 経由 %s/） ---\n' "$ROOT_PATH"
-      printf 'ROOT_PATH=%s\n' "$ROOT_PATH"
+      printf '\n# --- 配信パス（start.sh の PUBLIC_PREFIX と揃える） ---\n'
+      printf '%s\n' "$want"
     } >> "$env_file"
-  elif grep -q '^ROOT_PATH=[[:space:]]*$' "$env_file"; then
-    log ".env の空の ROOT_PATH を ${ROOT_PATH} に設定します"
-    local tmp
-    tmp="$(mktemp)"
-    sed "s|^ROOT_PATH=.*|ROOT_PATH=${ROOT_PATH}|" "$env_file" > "$tmp" && mv "$tmp" "$env_file"
   fi
 }
 
 build_frontend_if_needed() {
-  if [ -f "${SCRIPT_DIR}/frontend/dist/index.html" ]; then
+  # 期待する base（ルート配信なら /assets/、サブパス維持なら /Midair.io/assets/）で
+  # ビルド済みかを確認し、違えば（未ビルド・方式切替後）作り直す。
+  local index="${SCRIPT_DIR}/frontend/dist/index.html"
+  if [ -f "$index" ] && grep -qF "src=\"${PUBLIC_PREFIX}/assets/" "$index"; then
     return 0
   fi
   need_cmd npm
-  log "フロント静的ファイルが無いためビルドします (BASE_PATH=${ROOT_PATH}/)"
-  ( cd "${SCRIPT_DIR}/frontend" && npm install && BASE_PATH="${ROOT_PATH}/" npm run build )
+  log "フロントをビルドします (BASE_PATH=${PUBLIC_PREFIX}/)"
+  ( cd "${SCRIPT_DIR}/frontend" && npm install && BASE_PATH="${PUBLIC_PREFIX}/" npm run build )
 }
 
 start_backend() {
@@ -172,8 +189,8 @@ start_backend() {
 }
 
 start_frontend() {
-  log "フロント静的配信を起動します (http://${BACKEND_HOST}:${FRONTEND_PORT}${ROOT_PATH}/)"
-  PORT="$FRONTEND_PORT" nohup python3 "${SCRIPT_DIR}/serve_frontend.py" \
+  log "フロント静的配信を起動します (http://${BACKEND_HOST}:${FRONTEND_PORT}${PUBLIC_PREFIX}/)"
+  PORT="$FRONTEND_PORT" PREFIX="$PUBLIC_PREFIX" nohup python3 "${SCRIPT_DIR}/serve_frontend.py" \
     >> "${LOG_DIR}/frontend.log" 2>&1 &
   echo $! > "${LOG_DIR}/frontend.pid"
 }
@@ -239,8 +256,8 @@ start_all() {
 ============================================================
   MidAir.io Web公開サーバー 起動完了
 ============================================================
-  公開URL : https://music.wawa-app.me${ROOT_PATH}/
-  ローカル : http://${BACKEND_HOST}:${FRONTEND_PORT}${ROOT_PATH}/
+  公開URL : ${PUBLIC_URL}/
+  ローカル : http://${BACKEND_HOST}:${FRONTEND_PORT}${PUBLIC_PREFIX}/
   API     : http://${BACKEND_HOST}:${BACKEND_PORT}/docs
 
   ログ:

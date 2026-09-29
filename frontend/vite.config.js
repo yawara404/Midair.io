@@ -17,7 +17,8 @@ function gaIdPlugin() {
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [vue(), gaIdPlugin()],
-  // サブパス配信（例: /Midair.io/）に対応。`BASE_PATH` 未設定なら '/'
+  // 公開中の radio.wawa-app.me はサブパス維持のため base は '/Midair.io/'
+  // （ルート直下配信にする場合は BASE_PATH を指定しない＝既定の '/'）
   base: process.env.BASE_PATH || '/',
   define: {
     // Vite dev / 通常ビルドでは false（APIは相対 /api、履歴ルーティング）

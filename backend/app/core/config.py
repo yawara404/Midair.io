@@ -182,7 +182,9 @@ class Settings(BaseSettings):
     # CORS 許可オリジン
     cors_origins: str = "*"
 
-    # サブパス配信時の API ルート（例: /Midair.io）。ローカル/root 配信では空。
+    # サブパス配信時にだけ使う API ルート（例: /Midair.io）。
+    # 公開中の radio.wawa-app.me/Midair.io/ はサブパス維持のため /Midair.io
+    # （ルート直下配信に変える場合は空にする）
     root_path: str = ""
 
     model_config = SettingsConfigDict(

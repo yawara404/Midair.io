@@ -1,37 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://music.wawa-app.me/Midair.io/</loc>
+    <loc>https://radio.wawa-app.me/Midair.io/</loc>
     <changefreq>hourly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://music.wawa-app.me/Midair.io/archive</loc>
+    <loc>https://radio.wawa-app.me/Midair.io/archive</loc>
     <changefreq>hourly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://music.wawa-app.me/Midair.io/frequencies</loc>
+    <loc>https://radio.wawa-app.me/Midair.io/frequencies</loc>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://music.wawa-app.me/Midair.io/privacy</loc>
+    <loc>https://radio.wawa-app.me/Midair.io/privacy</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://music.wawa-app.me/Midair.io/terms</loc>
+    <loc>https://radio.wawa-app.me/Midair.io/terms</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://music.wawa-app.me/Midair.io/sitemap</loc>
+    <loc>https://radio.wawa-app.me/Midair.io/sitemap</loc>
     <changefreq>weekly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://music.wawa-app.me/Midair.io/about</loc>
+    <loc>https://radio.wawa-app.me/Midair.io/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>

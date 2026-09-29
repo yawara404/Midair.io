@@ -6,7 +6,7 @@
 // 運営者情報（必要なら書き換えてください）
 export const OPERATOR = {
   github: 'https://github.com/yawara404/Midair.io',
-  publicUrl: 'https://music.wawa-app.me/Midair.io/',
+  publicUrl: 'https://radio.wawa-app.me/Midair.io/',
 }
 export const UPDATED = '2026-09-28'
 

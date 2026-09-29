@@ -1,22 +1,26 @@
 #!/usr/bin/env python3
-"""Midair.io — スタンドアロン配信サーバー（/Midair.io/ サブパス対応）
+"""Midair.io — スタンドアロン配信サーバー（サブドメインのルート直下配信）
 
 Cloudflare Tunnel から localhost:8090 に来たリクエストを、
-frontend/dist の静的ファイル（サブパス /Midair.io/ 配下）へマッピングして返す。
+frontend/dist の静的ファイルへマッピングして返す。
 
-- /Midair.io/            → frontend/dist/index.html
-- /Midair.io/assets/xxx  → frontend/dist/assets/xxx
-- SPA フォールバック: /Midair.io/ 以下の未知パス → index.html
+- /            → frontend/dist/index.html
+- /assets/xxx  → frontend/dist/assets/xxx
+- SPA フォールバック: 未知パス（拡張子なし） → index.html
 
 API / WebSocket はトンネルの ingress で localhost:8000 に振り分けられるため、
 このサーバーは静的配信のみを担当する。
+
+公開URL: https://radio.wawa-app.me/（専用サブドメイン・ルート配信）
+旧サブパス配信（/Midair.io/ など）に戻す場合は PREFIX=/Midair.io を指定する。
 """
 import os
 import re
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 DIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
-PREFIX = "/Midair.io"
+# ルート配信なら空。サブパス配信（例: /Midair.io）に戻すときだけ環境変数で指定する。
+PREFIX = os.environ.get("PREFIX", "").rstrip("/")
 PORT = int(os.environ.get("PORT", "8090"))
 
 # ハッシュ付きファイル名（Viteのビルド成果物）。内容が変わると名前も変わるので長期キャッシュできる
@@ -31,13 +35,33 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _strip_prefix(self):
         path = self.path
+        if not PREFIX:
+            # ルート配信（radio.wawa-app.me）ではそのまま
+            return path
         if path == PREFIX:
             path = PREFIX + "/"
         if path.startswith(PREFIX + "/"):
             return path[len(PREFIX):]
         return path
 
+    def _redirect_root(self):
+        """サブパス配信（PREFIX 指定）では、サブドメインのルートを PREFIX/ へ302する。
+
+        vocaloid.hz（Nuxt が / を /Vocaloid.hz/ へ302）と同じ振る舞いに揃えるため。
+        ルート配信（PREFIX が空）では何もしない。
+        """
+        if not PREFIX:
+            return False
+        if self.path.split("?")[0] not in ("", "/"):
+            return False
+        self.send_response(302)
+        self.send_header("Location", PREFIX + "/")
+        self.end_headers()
+        return True
+
     def do_GET(self):
+        if self._redirect_root():
+            return
         self.path = self._strip_prefix()
         # SPA フォールバック（拡張子のないパスは index.html）
         local = self.translate_path(self.path)
@@ -46,6 +70,8 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_HEAD(self):
+        if self._redirect_root():
+            return
         self.path = self._strip_prefix()
         local = self.translate_path(self.path)
         if not os.path.exists(local) and "." not in os.path.basename(self.path):

@@ -17,7 +17,8 @@ const MidAirCard = () => import('../components/MidAirCard.vue')
 
 // スタンドアロン（Live Server 等の静的サーバー）ではハッシュルーティング、
 // Vite dev / 通常ビルドでは履歴ルーティングを使う。
-// サブパス配信（例: /Midair.io/）では base を合わせる。
+// サブパス配信（例: /Midair.io/）に戻した場合のみ base を合わせる。
+// 公開中の radio.wawa-app.me/Midair.io/ はサブパス維持なので base は '/Midair.io/'。
 const BASE_URL = !__STANDALONE__ && import.meta.env.BASE_URL ? import.meta.env.BASE_URL : '/'
 
 const router = createRouter({

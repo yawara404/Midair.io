@@ -1,14 +1,15 @@
 // 軽量なAPIクライアント（JWTを自動付与）
 //
 // Vite dev / 通常ビルド（__STANDALONE__ = false）:
-//   API は base 配下の相対パス（既定 /api、サブパス配信時は /Midair.io/api）を使う。
+//   API は base 配下の相対パス（公開中は /Midair.io/api。ルート直下配信なら /api）を使う。
 // スタンドアロン（Live Server, __STANDALONE__ = true）:
 //   バックエンドは <現在のホスト>:8000 で直接起動している前提なので、
 //   API・WebSocket の接続先を明示的に組み立てる。
 
-// Vite の base（末尾スラッシュ付き）。例: '/' または '/Midair.io/'
+// Vite の base（末尾スラッシュ付き）。公開中の radio.wawa-app.me はサブパス維持なので '/Midair.io/'
+// （ルート直下配信に変える場合は '/'）
 const BASE_URL = !__STANDALONE__ && import.meta.env.BASE_URL ? import.meta.env.BASE_URL : '/'
-// base からサブパス部分だけを取り出す（末尾スラッシュ除去）→ '' または '/Midair.io'
+// base からサブパス部分だけを取り出す（末尾スラッシュ除去）→ ''（ルート配信）または '/Midair.io'
 const BASE_PATH = BASE_URL.replace(/\/$/, '')
 
 const API_BASE = __STANDALONE__ ? `http://${location.hostname || 'localhost'}:8000` : BASE_PATH
@@ -22,7 +23,7 @@ export function apiBase() {
   return API_BASE
 }
 
-/** API の完全なベースURL（スタンドアロンは http://host:8000/api、通常は /api または /Midair.io/api） */
+/** API の完全なベースURL（スタンドアロンは http://host:8000/api、通常は /api） */
 export function apiRoot() {
   return __STANDALONE__ ? `${API_BASE}/api` : `${BASE_PATH}/api`
 }
