@@ -1,0 +1,22 @@
+# Midair.io — robots.txt
+# 公開URL: https://radio.wawa-app.me/Midair.io/
+#
+# 2026-09-28 に公開URLを https://music.wawa-app.me/Midair.io/ から
+# https://radio.wawa-app.me/Midair.io/ へ移行しました（旧URLは退役）。
+# 検索エンジンには下の Sitemap（新URL）を案内します。
+
+User-agent: *
+Allow: /
+
+# ログインが必要な画面・管理用（検索結果に出す必要がない）
+Disallow: /Midair.io/admin
+Disallow: /Midair.io/studio
+Disallow: /Midair.io/profile
+Disallow: /Midair.io/dedicated
+Disallow: /Midair.io/login
+
+# API / WebSocket はクロール対象外
+Disallow: /Midair.io/api/
+Disallow: /Midair.io/ws/
+
+Sitemap: https://radio.wawa-app.me/Midair.io/sitemap.xml

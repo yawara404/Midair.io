@@ -16,6 +16,16 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://radio.wawa-app.me/Midair.io/stations</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://radio.wawa-app.me/Midair.io/timetable</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://radio.wawa-app.me/Midair.io/privacy</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>

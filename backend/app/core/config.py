@@ -122,7 +122,7 @@ class Settings(BaseSettings):
     # 管理者が選んだ YouTube プレイリストの曲をランダムに流す自動DJ局。
     # playlistItems.list は検索クォータを消費しない（1回=1ユニット）ため、
     # 検索クォータ超過中でも選曲できる。曲数はプレイリスト側の変更に追随する。
-    dj_bot_playlist_id: str = "PLI-z8IB_57vJxbuz8eQ9LrW_WSt1dzBju"
+    dj_bot_playlist_id: str = "PLdwxvpeFNTt8"
     # 1回の取得で読むページ数（50曲/ページ。nextPageToken が無くなれば打ち切る）
     dj_bot_playlist_pages: int = 10
 
