@@ -4,6 +4,7 @@
 データベースは SQLite をデフォルトとし、DATABASE_URL を書き換えると
 MySQL（asyncmy）にも切り替えられる。
 """
+import secrets
 from pathlib import Path
 from typing import Optional
 
@@ -12,6 +13,27 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # このファイルは backend/app/core/config.py → backend/.env を参照する
 _ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
+# ---------------------------------------------------------------------------
+# 開発用のダミー既定値
+#
+# このリポジトリは公開されているため、以下の値は「誰でも知っている値」になる。
+#   SECRET_KEY      … この既定値のままだと JWT (HS256) を誰でも偽造でき、
+#                     任意のユーザー (管理者を含む) になりすませる。
+#   ADMIN_PASSWORD  … この既定値のままだと admin / change-me-admin で
+#                     誰でも管理者としてログインできる。
+# 未設定・既定値のまま起動された場合は、下の HARDENING でランダム値へ置き換える。
+# ---------------------------------------------------------------------------
+DEV_SECRET_KEY = "midair-dev-secret-key-change-me-in-production-0123456789"
+DEV_ADMIN_PASSWORD = "change-me-admin"
+MIN_SECRET_KEY_BYTES = 32
+
+# .env.example などに載っているプレースホルダ。これらは公開リポジトリで誰でも読めるため、
+# そのまま SECRET_KEY に使われていても「本物の鍵」として扱わない。
+INSECURE_SECRET_KEYS = {
+    DEV_SECRET_KEY,
+    "change-me-to-a-random-secret-at-least-32-bytes",
+}
+
 
 class Settings(BaseSettings):
     app_name: str = "Midair.io"
@@ -19,14 +41,14 @@ class Settings(BaseSettings):
     # SQLite デフォルト / MySQL は env で切替
     database_url: str = "sqlite+aiosqlite:///./midair.db"
 
-    # 認証 / JWT
-    secret_key: str = "midair-dev-secret-key-change-me-in-production-0123456789"
+    # 認証 / JWT (SECRET_KEY は backend/.env で必ず設定する)
+    secret_key: str = DEV_SECRET_KEY
     access_token_expire_minutes: int = 60 * 24 * 7  # 7日
 
     # 初期管理者アカウント（初回起動時のシード。.env で必ず変更する）
     admin_username: str = "admin"
     admin_email: str = "admin@example.com"
-    admin_password: str = "change-me-admin"
+    admin_password: str = DEV_ADMIN_PASSWORD
 
     # Discord OAuth2（設定時のみ有効）
     discord_client_id: Optional[str] = None
@@ -195,3 +217,40 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# ---------------------------------------------------------------------------
+# HARDENING: 安全でない既定値を起動時に排除する
+#
+# backend/.env を用意し忘れた状態や、.env.example のダミーをそのまま使った状態でも、
+# 公開サーバーが「誰でも管理者になれる」状態で動かないようにする。
+#   - SECRET_KEY: 未設定 / 既定値 / 32バイト未満 → 起動ごとのランダム値にする
+#     (再起動でログインは切れるが、偽造トークンは通らなくなる)
+#   - ADMIN_PASSWORD: 未設定 / 既定値 → ランダム値を生成し、ログへ1回だけ表示する
+#     (main.py のシード処理が、既存DBに残った既定パスワードも差し替える)
+# ---------------------------------------------------------------------------
+INSECURE_DEFAULTS = {
+    "secret_key": (
+        not settings.secret_key
+        or settings.secret_key in INSECURE_SECRET_KEYS
+        or len(settings.secret_key.encode("utf-8")) < MIN_SECRET_KEY_BYTES
+    ),
+    "admin_password": (
+        not settings.admin_password
+        or settings.admin_password == DEV_ADMIN_PASSWORD
+    ),
+}
+
+if INSECURE_DEFAULTS["secret_key"]:
+    settings.secret_key = secrets.token_urlsafe(48)
+    print(
+        "[config] !! SECRET_KEY が未設定または既定値のため、起動ごとのランダム値を使います。"
+        " backend/.env に 32 バイト以上のランダムな SECRET_KEY を設定してください。"
+    )
+
+if INSECURE_DEFAULTS["admin_password"]:
+    settings.admin_password = secrets.token_urlsafe(12)
+    print(
+        "[config] !! ADMIN_PASSWORD が未設定または既定値のため、ランダムなパスワードを生成しました: "
+        f"{settings.admin_password}"
+        " — backend/.env の ADMIN_PASSWORD をこの値に設定してください (変更すると次回から固定になります)。"
+    )

@@ -7,9 +7,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 
-from app.core.config import settings
+from app.core.config import DEV_ADMIN_PASSWORD, INSECURE_DEFAULTS, settings
 from app.core.database import async_session_factory, init_db
-from app.core.security import hash_password
+from app.core.security import hash_password, verify_password
 from app.models.models import (
     BotStation,
     Program,
@@ -152,6 +152,18 @@ async def _seed() -> None:
             session.add(admin)
             await session.commit()
             await session.refresh(admin)
+        elif INSECURE_DEFAULTS["admin_password"] and verify_password(
+            DEV_ADMIN_PASSWORD, admin.password_hash
+        ):
+            # 既存DBに「公開リポジトリに載っている既定の管理者パスワード」が残っている場合、
+            # その値は誰でも知っているため、そのままでは誰でも管理者になれてしまう。
+            # 起動時に生成した新しいパスワードへ差し替える (新しい値は config.py がログに表示する)。
+            admin.password_hash = hash_password(_ADMIN_PASSWORD)
+            await session.commit()
+            print(
+                "[seed] 既定の管理者パスワードを検出したため、起動時に生成した"
+                "新しいパスワードへ変更しました。"
+            )
 
         station_result = await session.execute(select(Station.id))
         if station_result.first() is None:
